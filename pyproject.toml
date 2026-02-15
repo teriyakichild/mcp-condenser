@@ -1,13 +1,19 @@
 [project]
-name = "datatools"
+name = "mcp-condenser"
 version = "0.1.0"
-description = "Add your description here"
+description = "MCP proxy that condenses verbose JSON tool responses into compact TOON text for LLM context compression"
 requires-python = ">=3.13"
 dependencies = [
     "fastmcp>=2.14.5",
     "tiktoken>=0.12.0",
     "toon-format",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
 
 [tool.uv.sources]
 toon-format = { git = "https://github.com/toon-format/toon-python.git" }

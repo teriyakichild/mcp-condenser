@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: mcp-condenser-proxy
+  repository: mcp-condenser
   tag: ""  # defaults to appVersion
   pullPolicy: IfNotPresent
 
