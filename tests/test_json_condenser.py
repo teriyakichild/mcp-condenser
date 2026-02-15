@@ -1,0 +1,111 @@
+"""Basic tests for json_condenser core functions."""
+
+from collections import OrderedDict
+
+from json_condenser import classify, flatten, is_homogeneous_array, condense_json
+
+
+class TestClassify:
+    def test_primitives(self):
+        assert classify(None) == "null"
+        assert classify(True) == "bool"
+        assert classify(False) == "bool"
+        assert classify(42) == "number"
+        assert classify(3.14) == "number"
+        assert classify("hello") == "string"
+
+    def test_containers(self):
+        assert classify([]) == "array"
+        assert classify({}) == "object"
+
+    def test_unknown(self):
+        assert classify(object()) == "unknown"
+
+
+class TestFlatten:
+    def test_flat_dict(self):
+        result = flatten({"a": 1, "b": 2})
+        assert result == OrderedDict([("a", 1), ("b", 2)])
+
+    def test_nested_dict(self):
+        result = flatten({"a": {"b": {"c": 1}}})
+        assert result == OrderedDict([("a.b.c", 1)])
+
+    def test_mixed_nesting(self):
+        result = flatten({"x": 1, "y": {"z": 2, "w": 3}})
+        assert result == OrderedDict([("x", 1), ("y.z", 2), ("y.w", 3)])
+
+    def test_arrays_kept_as_is(self):
+        result = flatten({"a": [1, 2, 3]})
+        assert result == OrderedDict([("a", [1, 2, 3])])
+
+    def test_empty_dict(self):
+        result = flatten({})
+        assert result == OrderedDict()
+
+
+class TestIsHomogeneousArray:
+    def test_uniform_dicts(self):
+        arr = [{"a": 1, "b": 2}, {"a": 3, "b": 4}, {"a": 5, "b": 6}]
+        assert is_homogeneous_array(arr) is True
+
+    def test_single_item(self):
+        assert is_homogeneous_array([{"a": 1}]) is False
+
+    def test_empty(self):
+        assert is_homogeneous_array([]) is False
+
+    def test_non_dicts(self):
+        assert is_homogeneous_array([1, 2, 3]) is False
+
+    def test_sparse_keys(self):
+        # Only 1 out of 3 keys shared — below 60% threshold
+        arr = [{"a": 1, "b": 2, "c": 3}, {"a": 1, "d": 4, "e": 5}]
+        assert is_homogeneous_array(arr) is False
+
+    def test_mostly_shared_keys(self):
+        arr = [{"a": 1, "b": 2, "c": 3}, {"a": 1, "b": 2, "d": 4}]
+        # 2 out of 4 union keys shared = 50%, below threshold
+        assert is_homogeneous_array(arr) is False
+
+
+class TestCondenseJson:
+    def test_simple_object(self):
+        data = {"name": "test", "value": 42}
+        result = condense_json(data)
+        assert "name" in result
+        assert "test" in result
+        assert "42" in result
+
+    def test_homogeneous_array(self):
+        data = [
+            {"id": 1, "name": "alice"},
+            {"id": 2, "name": "bob"},
+            {"id": 3, "name": "carol"},
+        ]
+        result = condense_json(data)
+        assert "alice" in result
+        assert "bob" in result
+        assert "carol" in result
+        # Should mention row count
+        assert "3 rows" in result
+
+    def test_nested_object(self):
+        data = {"outer": {"inner": {"deep": "value"}}}
+        result = condense_json(data)
+        assert "deep" in result
+        assert "value" in result
+
+    def test_scalar_value(self):
+        assert "hello" in condense_json("hello")
+        assert "42" in condense_json(42)
+
+    def test_round_trip_preserves_data(self):
+        """All scalar values from the input should appear in the output."""
+        data = {"items": [
+            {"name": "x", "count": 10},
+            {"name": "y", "count": 20},
+        ]}
+        result = condense_json(data)
+        for val in ("x", "y", "10", "20"):
+            assert val in result

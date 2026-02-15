@@ -10,7 +10,7 @@ wheels/
 .venv
 
 # Scratch / data files
-out/
+out
 *.json
 research.md
 
