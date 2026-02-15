@@ -1,0 +1,12 @@
+[project]
+name = "datatools"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "tiktoken>=0.12.0",
+    "toon-format",
+]
+
+[tool.uv.sources]
+toon-format = { git = "https://github.com/toon-format/toon-python.git" }
