@@ -1,0 +1,34 @@
+replicaCount: 1
+
+image:
+  repository: mcp-condenser-proxy
+  tag: ""  # defaults to appVersion
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+config:
+  upstreamMcpUrl: ""  # required — URL of the upstream MCP server
+  condenseTools: "*"  # comma-separated tool names, or * for all
+  proxyPort: 9000
+
+service:
+  type: ClusterIP
+  port: 9000
+
+resources: {}
+  # limits:
+  #   cpu: 500m
+  #   memory: 256Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+podAnnotations: {}
+podLabels: {}

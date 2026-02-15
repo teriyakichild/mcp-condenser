@@ -1,0 +1,7 @@
+MCP Condenser Proxy has been deployed.
+
+Get the service URL:
+  kubectl get svc {{ include "mcp-condenser-proxy.fullname" . }} -n {{ .Release.Namespace }}
+
+To use as an MCP endpoint, point your agent at:
+  http://{{ include "mcp-condenser-proxy.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}/mcp
