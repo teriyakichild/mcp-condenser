@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "mcp-condenser-proxy.fullname" . }}
+  name: {{ include "mcp-condenser.fullname" . }}
   labels:
-    {{- include "mcp-condenser-proxy.labels" . | nindent 4 }}
+    {{- include "mcp-condenser.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -12,4 +12,4 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "mcp-condenser-proxy.selectorLabels" . | nindent 4 }}
+    {{- include "mcp-condenser.selectorLabels" . | nindent 4 }}

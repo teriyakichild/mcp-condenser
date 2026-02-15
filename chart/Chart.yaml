@@ -1,5 +1,5 @@
 apiVersion: v2
-name: mcp-condenser-proxy
+name: mcp-condenser
 description: MCP proxy that condenses JSON tool responses into compact TOON text
 type: application
 version: 0.1.0

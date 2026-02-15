@@ -1,8 +1,8 @@
-{{- define "mcp-condenser-proxy.name" -}}
+{{- define "mcp-condenser.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
-{{- define "mcp-condenser-proxy.fullname" -}}
+{{- define "mcp-condenser.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -15,14 +15,14 @@
 {{- end }}
 {{- end }}
 
-{{- define "mcp-condenser-proxy.labels" -}}
+{{- define "mcp-condenser.labels" -}}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{ include "mcp-condenser-proxy.selectorLabels" . }}
+{{ include "mcp-condenser.selectorLabels" . }}
 app.kubernetes.io/version: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
-{{- define "mcp-condenser-proxy.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "mcp-condenser-proxy.name" . }}
+{{- define "mcp-condenser.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "mcp-condenser.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
