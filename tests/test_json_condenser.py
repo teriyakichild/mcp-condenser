@@ -2,7 +2,7 @@
 
 from collections import OrderedDict
 
-from json_condenser import classify, flatten, is_homogeneous_array, condense_json
+from json_condenser import classify, flatten, is_homogeneous_array, condense_json, toon_encode_json
 
 
 class TestClassify:
@@ -109,3 +109,40 @@ class TestCondenseJson:
         result = condense_json(data)
         for val in ("x", "y", "10", "20"):
             assert val in result
+
+
+class TestToonEncodeJson:
+    def test_basic_array(self):
+        """Direct TOON encoding of a homogeneous array without elision."""
+        data = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
+        result = toon_encode_json(data)
+        # All values preserved — no elision
+        for val in ("1", "2", "3", "4"):
+            assert val in result
+        # Column headers present
+        assert "a" in result
+        assert "b" in result
+
+    def test_simple_object(self):
+        data = {"name": "test", "value": 42}
+        result = toon_encode_json(data)
+        assert "name" in result
+        assert "test" in result
+        assert "42" in result
+
+    def test_preserves_all_values(self):
+        """Verify no data is lost — toon_encode_json should not elide anything."""
+        data = [
+            {"id": 1, "status": "ok", "count": 0},
+            {"id": 2, "status": "ok", "count": 0},
+            {"id": 3, "status": "ok", "count": 0},
+        ]
+        result = toon_encode_json(data)
+        # condense_json would elide constant "status" and all-zero "count",
+        # but toon_encode_json should preserve them
+        for val in ("1", "2", "3", "ok", "0"):
+            assert val in result
+
+    def test_scalar(self):
+        assert "hello" in toon_encode_json("hello")
+        assert "42" in toon_encode_json(42)

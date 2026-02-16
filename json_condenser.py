@@ -446,6 +446,11 @@ def condense_json(data: Any) -> str:
     return "\n\n".join(condense("root", data))
 
 
+def toon_encode_json(data: Any) -> str:
+    """Convert JSON data directly to TOON format without semantic preprocessing."""
+    return toon_format.encode(data)
+
+
 # ── stats ────────────────────────────────────────────────────────────────────
 
 def stats(orig: str, cond: str) -> dict:

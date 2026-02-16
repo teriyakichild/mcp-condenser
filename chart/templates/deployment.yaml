@@ -38,6 +38,10 @@ spec:
               value: {{ required "config.upstreamMcpUrl is required" .Values.config.upstreamMcpUrl | quote }}
             - name: CONDENSE_TOOLS
               value: {{ .Values.config.condenseTools | quote }}
+            - name: TOON_ONLY_TOOLS
+              value: {{ .Values.config.toonOnlyTools | quote }}
+            - name: TOON_FALLBACK
+              value: {{ .Values.config.toonFallback | quote }}
             - name: PROXY_HOST
               value: "0.0.0.0"
             - name: PROXY_PORT
