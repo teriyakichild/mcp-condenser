@@ -56,10 +56,30 @@ class CondenserMiddleware(Middleware):
         self.toon_only_allowlist = toon_only_allowlist or set()
         self.toon_fallback = toon_fallback
 
+    def _should_process(self, tool_name: str) -> bool:
+        """Check if a tool should be processed by any condensing path."""
+        if tool_name in self.toon_only_allowlist:
+            return True
+        if self.tools_allowlist is None or tool_name in self.tools_allowlist:
+            return True
+        if self.toon_fallback:
+            return True
+        return False
+
+    async def on_list_tools(self, context, call_next):
+        tools = await call_next(context)
+        # Strip outputSchema from tools we'll condense so the client
+        # doesn't expect structuredContent in responses.
+        for tool in tools:
+            if self._should_process(tool.name):
+                tool.output_schema = None
+        return tools
+
     async def on_call_tool(self, context, call_next) -> ToolResult:
         tool_name = context.message.name
         result = await call_next(context)
 
+        condensed_any = False
         for item in result.content:
             if not isinstance(item, TextContent):
                 continue
@@ -87,6 +107,7 @@ class CondenserMiddleware(Middleware):
                 continue
 
             item.text = condensed
+            condensed_any = True
 
             s = stats(orig_text, condensed)
             print(
@@ -95,6 +116,10 @@ class CondenserMiddleware(Middleware):
                 f"({s['tok_pct']}% reduction)",
                 file=sys.stderr,
             )
+
+        # Clear structuredContent so the client uses our condensed text
+        if condensed_any:
+            result.structured_content = None
 
         return result
 
