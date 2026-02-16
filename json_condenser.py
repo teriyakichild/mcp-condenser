@@ -437,13 +437,37 @@ def condense(name: str, obj: Any) -> list[str]:
     return blocks
 
 
+def _is_scalar_line(block: str) -> bool:
+    """True if block is a single key: value line (no header/section)."""
+    return "\n" not in block and not block.startswith("---")
+
+
+def _join_blocks(blocks: list[str]) -> str:
+    """Join blocks, grouping consecutive scalar lines with single newlines."""
+    if not blocks:
+        return ""
+    parts = []
+    scalar_group: list[str] = []
+    for block in blocks:
+        if _is_scalar_line(block):
+            scalar_group.append(block)
+        else:
+            if scalar_group:
+                parts.append("\n".join(scalar_group))
+                scalar_group = []
+            parts.append(block)
+    if scalar_group:
+        parts.append("\n".join(scalar_group))
+    return "\n\n".join(parts)
+
+
 def condense_json(data: Any) -> str:
     if isinstance(data, dict):
         blocks = []
         for k in data:
             blocks.extend(condense(k, data[k]))
-        return "\n\n".join(blocks)
-    return "\n\n".join(condense("root", data))
+        return _join_blocks(blocks)
+    return _join_blocks(condense("root", data))
 
 
 def toon_encode_json(data: Any) -> str:
