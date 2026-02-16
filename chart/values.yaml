@@ -14,6 +14,8 @@ config:
   condenseTools: "*"  # comma-separated tool names, or * for all
   toonOnlyTools: ""   # comma-separated tool names for direct TOON encoding (no preprocessing)
   toonFallback: "true"  # convert unmatched JSON results to TOON by default
+  minTokenThreshold: "0"  # skip condensing if original is below this token count (0 = off)
+  revertIfLarger: "false"  # keep original response if condensed has more tokens
   proxyPort: 9000
 
 service:

@@ -5,14 +5,18 @@ Sits between an agent and an upstream MCP server, intercepting tool responses
 and compressing verbose JSON (e.g. Kubernetes API output) into compact TOON text.
 
 Configuration (environment variables):
-    UPSTREAM_MCP_URL  — URL of the upstream MCP server (required)
-    CONDENSE_TOOLS    — comma-separated tool names, or * for all (default: *)
-    TOON_ONLY_TOOLS   — comma-separated tool names for direct JSON→TOON
-                         encoding without semantic preprocessing (default: empty)
-    TOON_FALLBACK     — when true, JSON results from tools not in either list
-                         are still converted to TOON (default: true)
-    PROXY_HOST        — bind host (default: 0.0.0.0)
-    PROXY_PORT        — bind port (default: 9000)
+    UPSTREAM_MCP_URL    — URL of the upstream MCP server (required)
+    CONDENSE_TOOLS      — comma-separated tool names, or * for all (default: *)
+    TOON_ONLY_TOOLS     — comma-separated tool names for direct JSON→TOON
+                           encoding without semantic preprocessing (default: empty)
+    TOON_FALLBACK       — when true, JSON results from tools not in either list
+                           are still converted to TOON (default: true)
+    MIN_TOKEN_THRESHOLD — skip condensing if original response is below this
+                           token count (default: 0 = off)
+    REVERT_IF_LARGER    — when true, keep the original response if the condensed
+                           output has more tokens than the original (default: false)
+    PROXY_HOST          — bind host (default: 0.0.0.0)
+    PROXY_PORT          — bind port (default: 9000)
 
 Processing order for each JSON tool result:
     1. Tool in TOON_ONLY_TOOLS → toon_format.encode (no preprocessing)
@@ -33,7 +37,7 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.tools.tool import ToolResult
 from mcp.types import TextContent
 
-from json_condenser import condense_json, toon_encode_json, stats
+from json_condenser import condense_json, toon_encode_json, stats, count_tokens
 
 
 class CondenserMiddleware(Middleware):
@@ -44,17 +48,23 @@ class CondenserMiddleware(Middleware):
         tools_allowlist: set[str] | None = None,
         toon_only_allowlist: set[str] | None = None,
         toon_fallback: bool = True,
+        min_token_threshold: int = 0,
+        revert_if_larger: bool = False,
     ):
         """
         Args:
             tools_allowlist: Set of tool names for full condensing, or None for all.
             toon_only_allowlist: Set of tool names for direct TOON encoding (no preprocessing).
             toon_fallback: When True, JSON from unmatched tools is still TOON-encoded.
+            min_token_threshold: Skip condensing if original is below this token count (0 = off).
+            revert_if_larger: When True, keep original if condensed has more tokens.
         """
         super().__init__()
         self.tools_allowlist = tools_allowlist
         self.toon_only_allowlist = toon_only_allowlist or set()
         self.toon_fallback = toon_fallback
+        self.min_token_threshold = min_token_threshold
+        self.revert_if_larger = revert_if_larger
 
     def _should_process(self, tool_name: str) -> bool:
         """Check if a tool should be processed by any condensing path."""
@@ -89,6 +99,17 @@ class CondenserMiddleware(Middleware):
                 continue
 
             orig_text = item.text
+            orig_tokens = count_tokens(orig_text)
+
+            # Check minimum token threshold — skip if below
+            if self.min_token_threshold > 0 and orig_tokens < self.min_token_threshold:
+                print(
+                    f"[condenser] {tool_name}: skipped — "
+                    f"{orig_tokens:,} tokens below threshold "
+                    f"({self.min_token_threshold:,})",
+                    file=sys.stderr,
+                )
+                continue
 
             # 1. TOON_ONLY_TOOLS → direct TOON encoding
             if tool_name in self.toon_only_allowlist:
@@ -106,10 +127,21 @@ class CondenserMiddleware(Middleware):
             else:
                 continue
 
+            s = stats(orig_text, condensed, orig_tok=orig_tokens)
+
+            # Revert if condensed is larger than original
+            if self.revert_if_larger and s["cond_tok"] >= s["orig_tok"]:
+                print(
+                    f"[condenser] {tool_name} ({mode}): reverted — "
+                    f"condensed {s['cond_tok']:,} tokens >= "
+                    f"original {s['orig_tok']:,} tokens",
+                    file=sys.stderr,
+                )
+                continue
+
             item.text = condensed
             condensed_any = True
 
-            s = stats(orig_text, condensed)
             print(
                 f"[condenser] {tool_name} ({mode}): "
                 f"{s['orig_tok']:,}→{s['cond_tok']:,} tokens "
@@ -142,17 +174,27 @@ def main():
     toon_fallback_env = os.environ.get("TOON_FALLBACK", "true").strip().lower()
     toon_fallback = toon_fallback_env not in ("false", "0", "no")
 
+    min_token_threshold = int(os.environ.get("MIN_TOKEN_THRESHOLD", "0"))
+
+    revert_if_larger_env = os.environ.get("REVERT_IF_LARGER", "false").strip().lower()
+    revert_if_larger = revert_if_larger_env not in ("false", "0", "no")
+
     host = os.environ.get("PROXY_HOST", "0.0.0.0")
     port = int(os.environ.get("PROXY_PORT", "9000"))
 
     proxy = FastMCP.as_proxy(upstream_url)
-    proxy.add_middleware(CondenserMiddleware(tools_allowlist, toon_only_allowlist, toon_fallback))
+    proxy.add_middleware(CondenserMiddleware(
+        tools_allowlist, toon_only_allowlist, toon_fallback,
+        min_token_threshold, revert_if_larger,
+    ))
 
     print(f"MCP condenser proxy starting on {host}:{port}", file=sys.stderr)
     print(f"  upstream: {upstream_url}", file=sys.stderr)
     print(f"  condensing: {condense_tools_env}", file=sys.stderr)
     print(f"  toon-only: {toon_only_env or '(none)'}", file=sys.stderr)
     print(f"  toon-fallback: {toon_fallback}", file=sys.stderr)
+    print(f"  min-token-threshold: {min_token_threshold or 'off'}", file=sys.stderr)
+    print(f"  revert-if-larger: {revert_if_larger}", file=sys.stderr)
 
     proxy.run(transport="streamable-http", host=host, port=port)
 

@@ -42,6 +42,10 @@ spec:
               value: {{ .Values.config.toonOnlyTools | quote }}
             - name: TOON_FALLBACK
               value: {{ .Values.config.toonFallback | quote }}
+            - name: MIN_TOKEN_THRESHOLD
+              value: {{ .Values.config.minTokenThreshold | quote }}
+            - name: REVERT_IF_LARGER
+              value: {{ .Values.config.revertIfLarger | quote }}
             - name: PROXY_HOST
               value: "0.0.0.0"
             - name: PROXY_PORT

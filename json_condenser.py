@@ -477,9 +477,9 @@ def toon_encode_json(data: Any) -> str:
 
 # ── stats ────────────────────────────────────────────────────────────────────
 
-def stats(orig: str, cond: str) -> dict:
+def stats(orig: str, cond: str, orig_tok: int | None = None) -> dict:
     oc, cc = len(orig), len(cond)
-    ot = count_tokens(orig)
+    ot = orig_tok if orig_tok is not None else count_tokens(orig)
     ct = count_tokens(cond)
     return {
         "orig_chars": oc, "cond_chars": cc,
