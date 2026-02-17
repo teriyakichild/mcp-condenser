@@ -2,7 +2,9 @@
 
 from collections import OrderedDict
 
-from json_condenser import classify, flatten, is_homogeneous_array, condense_json, toon_encode_json
+import pytest
+
+from json_condenser import classify, flatten, is_homogeneous_array, condense_json, toon_encode_json, parse_input
 
 
 class TestClassify:
@@ -146,3 +148,85 @@ class TestToonEncodeJson:
     def test_scalar(self):
         assert "hello" in toon_encode_json("hello")
         assert "42" in toon_encode_json(42)
+
+
+class TestParseInput:
+    def test_json_object(self):
+        data, fmt = parse_input('{"a": 1}')
+        assert data == {"a": 1}
+        assert fmt == "json"
+
+    def test_json_array(self):
+        data, fmt = parse_input('[1, 2, 3]')
+        assert data == [1, 2, 3]
+        assert fmt == "json"
+
+    def test_yaml_object(self):
+        data, fmt = parse_input("name: alice\nage: 30\n")
+        assert data == {"name": "alice", "age": 30}
+        assert fmt == "yaml"
+
+    def test_yaml_list(self):
+        text = "- name: alice\n  age: 30\n- name: bob\n  age: 25\n"
+        data, fmt = parse_input(text)
+        assert len(data) == 2
+        assert fmt == "yaml"
+
+    def test_yaml_nested(self):
+        text = "metadata:\n  name: nginx\n  namespace: default\n"
+        data, fmt = parse_input(text)
+        assert data == {"metadata": {"name": "nginx", "namespace": "default"}}
+        assert fmt == "yaml"
+
+    def test_json_preferred_over_yaml(self):
+        """JSON-valid input should parse as JSON, not YAML."""
+        data, fmt = parse_input('{"a": 1}')
+        assert fmt == "json"
+
+    def test_plain_scalar_rejected(self):
+        """Bare scalars are valid YAML but not useful structured data."""
+        with pytest.raises(ValueError):
+            parse_input("just a string")
+
+    def test_empty_rejected(self):
+        with pytest.raises(ValueError):
+            parse_input("")
+
+    def test_invalid_both(self):
+        with pytest.raises(ValueError):
+            parse_input("{{not valid::")
+
+
+class TestCondenseYaml:
+    """Verify the full pipeline works with YAML-sourced data."""
+
+    def test_yaml_object_condenses(self):
+        text = "name: test\nvalue: 42\n"
+        data, _ = parse_input(text)
+        result = condense_json(data)
+        assert "test" in result
+        assert "42" in result
+
+    def test_yaml_homogeneous_array(self):
+        text = (
+            "- id: 1\n  name: alice\n"
+            "- id: 2\n  name: bob\n"
+            "- id: 3\n  name: carol\n"
+        )
+        data, _ = parse_input(text)
+        result = condense_json(data)
+        assert "3 rows" in result
+        assert "alice" in result
+
+    def test_yaml_nested_k8s_style(self):
+        text = (
+            "metadata:\n"
+            "  name: nginx\n"
+            "  namespace: default\n"
+            "spec:\n"
+            "  replicas: 3\n"
+        )
+        data, _ = parse_input(text)
+        result = condense_json(data)
+        assert "nginx" in result
+        assert "default" in result

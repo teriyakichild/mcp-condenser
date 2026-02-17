@@ -37,7 +37,7 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.tools.tool import ToolResult
 from mcp.types import TextContent
 
-from json_condenser import condense_json, toon_encode_json, stats, count_tokens
+from json_condenser import condense_json, toon_encode_json, stats, count_tokens, parse_input
 
 
 class CondenserMiddleware(Middleware):
@@ -94,8 +94,8 @@ class CondenserMiddleware(Middleware):
             if not isinstance(item, TextContent):
                 continue
             try:
-                data = json.loads(item.text)
-            except (json.JSONDecodeError, TypeError):
+                data, input_fmt = parse_input(item.text)
+            except ValueError:
                 continue
 
             orig_text = item.text
@@ -143,7 +143,7 @@ class CondenserMiddleware(Middleware):
             condensed_any = True
 
             print(
-                f"[condenser] {tool_name} ({mode}): "
+                f"[condenser] {tool_name} ({mode}, {input_fmt}): "
                 f"{s['orig_tok']:,}→{s['cond_tok']:,} tokens "
                 f"({s['tok_pct']}% reduction)",
                 file=sys.stderr,

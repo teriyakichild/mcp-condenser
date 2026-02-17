@@ -14,6 +14,7 @@ Usage:
 """
 
 import json, sys, re, argparse
+import yaml
 from typing import Any
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timezone
@@ -30,6 +31,33 @@ except Exception:
     def count_tokens(text: str) -> int:
         return len(text) // 4
     TOKEN_METHOD = "len/4 estimate"
+
+
+# ── input parsing ─────────────────────────────────────────────────────────
+
+def parse_input(text: str) -> tuple[Any, str]:
+    """Parse text as JSON or YAML.
+
+    Returns (parsed_data, format_name).
+    Raises ValueError if neither format parses successfully.
+    """
+    # Try JSON first — it's stricter and faster
+    try:
+        return json.loads(text), "json"
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # Fall back to YAML
+    try:
+        data = yaml.safe_load(text)
+        # yaml.safe_load returns str for plain scalars and None for empty —
+        # only accept dicts/lists as meaningful structured data
+        if isinstance(data, (dict, list)):
+            return data, "yaml"
+    except yaml.YAMLError:
+        pass
+
+    raise ValueError("Input is not valid JSON or YAML")
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -510,13 +538,14 @@ def main():
     )
     args = parser.parse_args()
 
-    if args.input == "-" or (args.input == "-" and sys.stdin.isatty() is False):
-        data = json.load(sys.stdin)
+    if args.input == "-":
+        raw = sys.stdin.read()
     else:
         with open(args.input) as f:
-            data = json.load(f)
+            raw = f.read()
+    data, input_fmt = parse_input(raw)
 
-    orig = json.dumps(data)
+    orig = raw
     result = condense_json(data)
 
     if not args.quiet:

@@ -1,6 +1,6 @@
 # mcp-condenser
 
-MCP proxy that condenses verbose JSON tool responses into compact
+MCP proxy that condenses verbose JSON and YAML tool responses into compact
 [TOON](https://github.com/toon-format/spec) text, dramatically reducing token
 usage when LLM agents talk to tool-heavy servers (e.g. Kubernetes, cloud APIs).
 
@@ -17,12 +17,13 @@ achieves 60-80% token reduction on real-world API responses.
 
 ## CLI usage
 
-Condense a JSON file directly:
+Condense a JSON or YAML file:
 
 ```bash
 uv run python json_condenser.py input.json
+uv run python json_condenser.py input.yaml
 uv run python json_condenser.py input.json -o out.txt -q
-cat input.json | uv run python json_condenser.py
+cat pods.yaml | uv run python json_condenser.py
 ```
 
 ## MCP proxy usage
