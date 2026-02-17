@@ -1,10 +1,10 @@
-"""Basic tests for json_condenser core functions."""
+"""Basic tests for condenser core functions."""
 
 from collections import OrderedDict
 
 import pytest
 
-from json_condenser import classify, flatten, is_homogeneous_array, condense_json, toon_encode_json, parse_input
+from condenser import classify, flatten, is_homogeneous_array, condense_json, toon_encode_json, parse_input
 
 
 class TestClassify:

@@ -7,7 +7,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-install-project
 
-COPY json_condenser.py mcp_proxy.py ./
+COPY condenser.py mcp_proxy.py ./
 
 ENV PROXY_HOST=0.0.0.0
 ENV PROXY_PORT=9000

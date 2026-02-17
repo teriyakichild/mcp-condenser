@@ -1,5 +1,5 @@
 """
-json_condenser.py — JSON → compact TOON text for LLM consumption.
+condenser.py — JSON/YAML → compact TOON text for LLM consumption.
 
 Two-layer design:
   1. Preprocessing: flatten, detect homogeneous arrays, elide zero/null/constant
@@ -7,10 +7,11 @@ Two-layer design:
   2. Serialization: encode cleaned data with toon-python; prepend annotation lines.
 
 Usage:
-    python json_condenser.py input.json          # stdout
-    python json_condenser.py -                   # read stdin
-    cat input.json | python json_condenser.py    # read stdin (no args)
-    python json_condenser.py input.json -o out.txt -q
+    python condenser.py input.json               # stdout
+    python condenser.py input.yaml               # YAML too
+    python condenser.py -                        # read stdin
+    cat input.json | python condenser.py         # read stdin (no args)
+    python condenser.py input.json -o out.txt -q
 """
 
 import json, sys, re, argparse

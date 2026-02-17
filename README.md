@@ -20,10 +20,10 @@ achieves 60-80% token reduction on real-world API responses.
 Condense a JSON or YAML file:
 
 ```bash
-uv run python json_condenser.py input.json
-uv run python json_condenser.py input.yaml
-uv run python json_condenser.py input.json -o out.txt -q
-cat pods.yaml | uv run python json_condenser.py
+uv run python condenser.py input.json
+uv run python condenser.py input.yaml
+uv run python condenser.py input.json -o out.txt -q
+cat pods.yaml | uv run python condenser.py
 ```
 
 ## MCP proxy usage

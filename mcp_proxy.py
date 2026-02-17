@@ -1,5 +1,5 @@
 """
-mcp_proxy.py — MCP proxy that condenses JSON tool responses via json_condenser.
+mcp_proxy.py — MCP proxy that condenses JSON/YAML tool responses via condenser.
 
 Sits between an agent and an upstream MCP server, intercepting tool responses
 and compressing verbose JSON (e.g. Kubernetes API output) into compact TOON text.
@@ -37,7 +37,7 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.tools.tool import ToolResult
 from mcp.types import TextContent
 
-from json_condenser import condense_json, toon_encode_json, stats, count_tokens, parse_input
+from condenser import condense_json, toon_encode_json, stats, count_tokens, parse_input
 
 
 class CondenserMiddleware(Middleware):
