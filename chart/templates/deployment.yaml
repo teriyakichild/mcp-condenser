@@ -46,6 +46,10 @@ spec:
               value: {{ .Values.config.minTokenThreshold | quote }}
             - name: REVERT_IF_LARGER
               value: {{ .Values.config.revertIfLarger | quote }}
+            - name: MAX_TOKEN_LIMIT
+              value: {{ .Values.config.maxTokenLimit | quote }}
+            - name: TOOL_TOKEN_LIMITS
+              value: {{ .Values.config.toolTokenLimits | quote }}
             - name: PROXY_HOST
               value: "0.0.0.0"
             - name: PROXY_PORT

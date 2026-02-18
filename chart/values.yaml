@@ -16,6 +16,8 @@ config:
   toonFallback: "true"  # convert unmatched JSON results to TOON by default
   minTokenThreshold: "0"  # skip condensing if original is below this token count (0 = off)
   revertIfLarger: "false"  # keep original response if condensed has more tokens
+  maxTokenLimit: "0"  # global default token cap for all tool responses (0 = off)
+  toolTokenLimits: ""  # comma-separated tool_name:limit pairs for per-tool overrides
   proxyPort: 9000
 
 service:

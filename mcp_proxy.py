@@ -15,6 +15,10 @@ Configuration (environment variables):
                            token count (default: 0 = off)
     REVERT_IF_LARGER    — when true, keep the original response if the condensed
                            output has more tokens than the original (default: false)
+    MAX_TOKEN_LIMIT     — global default token cap for all tool responses
+                           (default: 0 = off / no limit)
+    TOOL_TOKEN_LIMITS   — comma-separated tool_name:limit pairs for per-tool
+                           token limit overrides (default: empty)
     PROXY_HOST          — bind host (default: 0.0.0.0)
     PROXY_PORT          — bind port (default: 9000)
 
@@ -37,7 +41,7 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.tools.tool import ToolResult
 from mcp.types import TextContent
 
-from condenser import condense_json, toon_encode_json, stats, count_tokens, parse_input
+from condenser import condense_json, toon_encode_json, stats, count_tokens, parse_input, truncate_to_token_limit
 
 
 class CondenserMiddleware(Middleware):
@@ -50,6 +54,8 @@ class CondenserMiddleware(Middleware):
         toon_fallback: bool = True,
         min_token_threshold: int = 0,
         revert_if_larger: bool = False,
+        max_token_limit: int = 0,
+        tool_token_limits: dict[str, int] | None = None,
     ):
         """
         Args:
@@ -58,6 +64,8 @@ class CondenserMiddleware(Middleware):
             toon_fallback: When True, JSON from unmatched tools is still TOON-encoded.
             min_token_threshold: Skip condensing if original is below this token count (0 = off).
             revert_if_larger: When True, keep original if condensed has more tokens.
+            max_token_limit: Global default token cap for all tool responses (0 = off).
+            tool_token_limits: Per-tool token limit overrides {tool_name: limit}.
         """
         super().__init__()
         self.tools_allowlist = tools_allowlist
@@ -65,6 +73,8 @@ class CondenserMiddleware(Middleware):
         self.toon_fallback = toon_fallback
         self.min_token_threshold = min_token_threshold
         self.revert_if_larger = revert_if_larger
+        self.max_token_limit = max_token_limit
+        self.tool_token_limits = tool_token_limits or {}
 
     def _should_process(self, tool_name: str) -> bool:
         """Check if a tool should be processed by any condensing path."""
@@ -153,6 +163,21 @@ class CondenserMiddleware(Middleware):
         if condensed_any:
             result.structured_content = None
 
+        # Apply token limit truncation as final step
+        effective_limit = self.tool_token_limits.get(tool_name, self.max_token_limit)
+        if effective_limit > 0:
+            for item in result.content:
+                if not isinstance(item, TextContent):
+                    continue
+                truncated = truncate_to_token_limit(item.text, effective_limit)
+                if truncated is not item.text:
+                    item.text = truncated
+                    print(
+                        f"[condenser] {tool_name}: truncated to "
+                        f"{effective_limit} token limit",
+                        file=sys.stderr,
+                    )
+
         return result
 
 
@@ -179,6 +204,17 @@ def main():
     revert_if_larger_env = os.environ.get("REVERT_IF_LARGER", "false").strip().lower()
     revert_if_larger = revert_if_larger_env not in ("false", "0", "no")
 
+    max_token_limit = int(os.environ.get("MAX_TOKEN_LIMIT", "0"))
+
+    tool_token_limits_env = os.environ.get("TOOL_TOKEN_LIMITS", "").strip()
+    tool_token_limits: dict[str, int] = {}
+    if tool_token_limits_env:
+        for pair in tool_token_limits_env.split(","):
+            pair = pair.strip()
+            if ":" in pair:
+                name, limit = pair.rsplit(":", 1)
+                tool_token_limits[name.strip()] = int(limit.strip())
+
     host = os.environ.get("PROXY_HOST", "0.0.0.0")
     port = int(os.environ.get("PROXY_PORT", "9000"))
 
@@ -186,6 +222,7 @@ def main():
     proxy.add_middleware(CondenserMiddleware(
         tools_allowlist, toon_only_allowlist, toon_fallback,
         min_token_threshold, revert_if_larger,
+        max_token_limit, tool_token_limits,
     ))
 
     print(f"MCP condenser proxy starting on {host}:{port}", file=sys.stderr)
@@ -195,6 +232,8 @@ def main():
     print(f"  toon-fallback: {toon_fallback}", file=sys.stderr)
     print(f"  min-token-threshold: {min_token_threshold or 'off'}", file=sys.stderr)
     print(f"  revert-if-larger: {revert_if_larger}", file=sys.stderr)
+    print(f"  max-token-limit: {max_token_limit or 'off'}", file=sys.stderr)
+    print(f"  tool-token-limits: {tool_token_limits_env or '(none)'}", file=sys.stderr)
 
     proxy.run(transport="streamable-http", host=host, port=port)
 

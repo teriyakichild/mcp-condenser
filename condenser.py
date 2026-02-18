@@ -504,6 +504,52 @@ def toon_encode_json(data: Any) -> str:
     return toon_format.encode(data)
 
 
+# ── truncation ────────────────────────────────────────────────────────────────
+
+def truncate_to_token_limit(text: str, max_tokens: int) -> str:
+    """Truncate text to fit within a token limit.
+
+    If the text is within the limit, returns it unchanged.
+    If over, binary-searches for the longest character prefix that fits
+    within max_tokens (minus overhead for the truncation notice), then
+    appends a truncation message.
+    """
+    if max_tokens <= 0:
+        return text
+
+    orig_tokens = count_tokens(text)
+    if orig_tokens <= max_tokens:
+        return text
+
+    # Build the truncation notice template (with placeholder counts)
+    # to measure its overhead; actual message is built at the end.
+    sample_notice = (
+        f"\n\n[truncated: output exceeded {max_tokens} token limit"
+        f" — {orig_tokens} tokens reduced to ~{max_tokens}]"
+    )
+    notice_overhead = count_tokens(sample_notice)
+    target = max_tokens - notice_overhead
+    if target <= 0:
+        target = 1
+
+    # Binary search for longest prefix that fits within target tokens
+    lo, hi = 0, len(text)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if count_tokens(text[:mid]) <= target:
+            lo = mid
+        else:
+            hi = mid - 1
+
+    truncated = text[:lo]
+    final_tokens = count_tokens(truncated) + notice_overhead
+    notice = (
+        f"\n\n[truncated: output exceeded {max_tokens} token limit"
+        f" — {orig_tokens} tokens reduced to ~{final_tokens}]"
+    )
+    return truncated + notice
+
+
 # ── stats ────────────────────────────────────────────────────────────────────
 
 def stats(orig: str, cond: str, orig_tok: int | None = None) -> dict:

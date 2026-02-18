@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 import pytest
 
-from condenser import classify, flatten, is_homogeneous_array, condense_json, toon_encode_json, parse_input
+from condenser import classify, flatten, is_homogeneous_array, condense_json, toon_encode_json, parse_input, truncate_to_token_limit, count_tokens
 
 
 class TestClassify:
@@ -230,3 +230,46 @@ class TestCondenseYaml:
         result = condense_json(data)
         assert "nginx" in result
         assert "default" in result
+
+
+class TestTruncateToTokenLimit:
+    def test_no_op_when_under_limit(self):
+        """Text within the token limit is returned unchanged."""
+        text = "hello world"
+        result = truncate_to_token_limit(text, 1000)
+        assert result == text
+
+    def test_no_op_when_limit_zero(self):
+        """Limit of 0 means no truncation (feature off)."""
+        text = "hello world"
+        result = truncate_to_token_limit(text, 0)
+        assert result == text
+
+    def test_truncation_when_over_limit(self):
+        """Text over the limit gets truncated to fewer tokens."""
+        text = "word " * 500  # ~500 tokens
+        result = truncate_to_token_limit(text, 50)
+        result_tokens = count_tokens(result)
+        # The result (including the notice) should be roughly within the limit
+        # Allow some slack for the notice overhead estimation
+        assert result_tokens <= 60  # 50 + reasonable slack
+        assert len(result) < len(text)
+
+    def test_truncation_message_present(self):
+        """Truncated output includes the truncation notice."""
+        text = "word " * 500
+        result = truncate_to_token_limit(text, 50)
+        assert "[truncated:" in result
+        assert "token limit" in result
+
+    def test_empty_text(self):
+        """Empty text is returned unchanged."""
+        result = truncate_to_token_limit("", 100)
+        assert result == ""
+
+    def test_exact_at_limit(self):
+        """Text exactly at the limit is returned unchanged."""
+        text = "hello"
+        tokens = count_tokens(text)
+        result = truncate_to_token_limit(text, tokens)
+        assert result == text
