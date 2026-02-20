@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v0.2.0 (2026-02-20)
+
+### Continuous Integration
+
+- Use RELEASE_TOKEN for semantic release to trigger CI on version commits
+  ([`b8c44f9`](https://github.com/teriyakichild/mcp-condenser/commit/b8c44f926becc6c5a8ad20dea763ca39c0c78b1f))
+
+### Features
+
+- Add Prometheus metrics with /metrics endpoint
+  ([`322d944`](https://github.com/teriyakichild/mcp-condenser/commit/322d944f84db4f2585c9259f91498c0e6b6b7f58))
+
+Add observability via prometheus-client with counters for requests, tokens, savings, and truncations
+  plus histograms for compression ratio and processing duration. Metrics are opt-in via
+  METRICS_ENABLED env var and served on a separate HTTP port (default 9090).
+
+- NoopRecorder/PrometheusRecorder behind shared protocol for zero overhead when disabled - Config
+  support via env vars and JSON config file - Helm chart with conditional metrics port and
+  ServiceMonitor - EXPOSE 9090 in Dockerfile
+
+
 ## v0.1.0 (2026-02-20)
 
 ### Bug Fixes
