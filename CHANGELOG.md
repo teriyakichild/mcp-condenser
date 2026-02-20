@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v0.4.2 (2026-02-20)
+
+### Bug Fixes
+
+- Commit uv.lock for Docker build
+  ([`d37c485`](https://github.com/teriyakichild/mcp-condenser/commit/d37c485f96ccd3a49c48804e53693be775c5e3d2))
+
+The Dockerfile copies uv.lock but it was gitignored, causing the Docker build to fail with "not
+  found".
+
+
 ## v0.4.1 (2026-02-20)
 
 ### Bug Fixes
