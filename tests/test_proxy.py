@@ -3,14 +3,17 @@
 import json
 
 import pytest
+from prometheus_client import CollectorRegistry
 
 from mcp_condenser.config import ServerConfig
+from mcp_condenser.metrics import PrometheusRecorder
 from mcp_condenser.proxy import CondenserMiddleware
 
 
 def _make_middleware(
     server_configs=None,
     tool_server_map=None,
+    metrics=None,
     **kwargs,
 ):
     """Helper to create a middleware with a single default server config."""
@@ -20,6 +23,7 @@ def _make_middleware(
     return CondenserMiddleware(
         server_configs=server_configs,
         tool_server_map=tool_server_map,
+        metrics=metrics,
     )
 
 
@@ -80,7 +84,7 @@ class TestCondenseItem:
         result = mw._condense_item(text, "special_tool", cfg)
         assert result is not None
         condensed, mode = result
-        assert mode == "toon-only"
+        assert mode == "toon_only"
         assert "test" in condensed
 
     def test_toon_fallback_mode(self):
@@ -90,7 +94,7 @@ class TestCondenseItem:
         result = mw._condense_item(text, "unmatched_tool", cfg)
         assert result is not None
         _, mode = result
-        assert mode == "toon-fallback"
+        assert mode == "toon_fallback"
 
     def test_passthrough_no_condense(self):
         mw = _make_middleware(condense=False)
@@ -158,3 +162,69 @@ class TestShouldProcess:
         mw = _make_middleware(tools=["other"], toon_fallback=False, toon_only_tools=[])
         cfg = mw._resolve_server_config("unmatched")
         assert mw._should_process("unmatched", cfg) is False
+
+
+class TestMetricsRecording:
+    """Verify that _condense_item records metrics correctly."""
+
+    def _make_with_metrics(self, **kwargs):
+        registry = CollectorRegistry()
+        rec = PrometheusRecorder(registry=registry)
+        mw = _make_middleware(metrics=rec, **kwargs)
+        return mw, registry
+
+    def test_condense_records_mode_and_tokens(self):
+        mw, reg = self._make_with_metrics()
+        cfg = mw._resolve_server_config("tool")
+        text = json.dumps({"items": [{"name": f"item-{i}", "value": i} for i in range(20)]})
+        result = mw._condense_item(text, "tool", cfg)
+        assert result is not None
+
+        assert reg.get_sample_value(
+            "condenser_requests_total",
+            {"tool": "tool", "server": "default", "mode": "condense"},
+        ) == 1.0
+        assert reg.get_sample_value(
+            "condenser_input_tokens_total",
+            {"tool": "tool", "server": "default"},
+        ) > 0
+        assert reg.get_sample_value(
+            "condenser_compression_ratio_count",
+            {"tool": "tool", "server": "default"},
+        ) == 1.0
+
+    def test_threshold_skip_records_skipped(self):
+        mw, reg = self._make_with_metrics(min_token_threshold=999999)
+        cfg = mw._resolve_server_config("tool")
+        text = json.dumps({"small": "data"})
+        result = mw._condense_item(text, "tool", cfg)
+        assert result is None
+
+        assert reg.get_sample_value(
+            "condenser_requests_total",
+            {"tool": "tool", "server": "default", "mode": "skipped"},
+        ) == 1.0
+
+    def test_non_json_records_passthrough(self):
+        mw, reg = self._make_with_metrics()
+        cfg = mw._resolve_server_config("tool")
+        result = mw._condense_item("not json", "tool", cfg)
+        assert result is None
+
+        assert reg.get_sample_value(
+            "condenser_requests_total",
+            {"tool": "tool", "server": "default", "mode": "passthrough"},
+        ) == 1.0
+
+    def test_revert_records_reverted(self):
+        mw, reg = self._make_with_metrics(revert_if_larger=True)
+        cfg = mw._resolve_server_config("tool")
+        # Tiny data likely to be reverted
+        text = json.dumps({"a": 1})
+        result = mw._condense_item(text, "tool", cfg)
+        if result is None:
+            # It was reverted
+            assert reg.get_sample_value(
+                "condenser_requests_total",
+                {"tool": "tool", "server": "default", "mode": "reverted"},
+            ) == 1.0

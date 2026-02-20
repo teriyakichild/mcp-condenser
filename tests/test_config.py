@@ -112,6 +112,46 @@ class TestFromEnv:
         assert srv.tool_token_limits == {"a": 1000, "b": 2000}
 
 
+class TestMetricsConfig:
+    def test_defaults(self):
+        config = ProxyConfig(servers={})
+        assert config.metrics_enabled is False
+        assert config.metrics_port == 9090
+
+    def test_from_env(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        monkeypatch.setenv("METRICS_ENABLED", "true")
+        monkeypatch.setenv("METRICS_PORT", "9191")
+        config = ProxyConfig.from_env()
+        assert config.metrics_enabled is True
+        assert config.metrics_port == 9191
+
+    def test_from_env_disabled(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        config = ProxyConfig.from_env()
+        assert config.metrics_enabled is False
+        assert config.metrics_port == 9090
+
+    def test_from_file(self, tmp_path):
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "global": {"metrics_enabled": True, "metrics_port": 9191},
+            "servers": {"s": {"url": "http://localhost/mcp"}},
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        assert config.metrics_enabled is True
+        assert config.metrics_port == 9191
+
+    def test_from_file_defaults(self, tmp_path):
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "servers": {"s": {"url": "http://localhost/mcp"}},
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        assert config.metrics_enabled is False
+        assert config.metrics_port == 9090
+
+
 class TestLoad:
     def test_prefers_config_file(self, tmp_path, monkeypatch):
         cfg_file = tmp_path / "config.json"

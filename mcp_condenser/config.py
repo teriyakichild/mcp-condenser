@@ -34,6 +34,8 @@ class ProxyConfig:
     host: str = "0.0.0.0"
     port: int = 9000
     multi_upstream: bool = False
+    metrics_enabled: bool = False
+    metrics_port: int = 9090
 
     @classmethod
     def from_env(cls) -> "ProxyConfig":
@@ -74,6 +76,10 @@ class ProxyConfig:
         host = os.environ.get("PROXY_HOST", "0.0.0.0")
         port = int(os.environ.get("PROXY_PORT", "9000"))
 
+        metrics_enabled_env = os.environ.get("METRICS_ENABLED", "false").strip().lower()
+        metrics_enabled = metrics_enabled_env not in ("false", "0", "no", "")
+        metrics_port = int(os.environ.get("METRICS_PORT", "9090"))
+
         server = ServerConfig(
             url=url,
             tools=tools,
@@ -85,7 +91,14 @@ class ProxyConfig:
             max_token_limit=max_token_limit,
             tool_token_limits=tool_token_limits,
         )
-        return cls(servers={"default": server}, host=host, port=port, multi_upstream=False)
+        return cls(
+            servers={"default": server},
+            host=host,
+            port=port,
+            multi_upstream=False,
+            metrics_enabled=metrics_enabled,
+            metrics_port=metrics_port,
+        )
 
     @classmethod
     def from_file(cls, path: str) -> "ProxyConfig":
@@ -96,6 +109,8 @@ class ProxyConfig:
         global_cfg = raw.get("global", {})
         host = global_cfg.get("host", "0.0.0.0")
         port = global_cfg.get("port", 9000)
+        metrics_enabled = global_cfg.get("metrics_enabled", False)
+        metrics_port = global_cfg.get("metrics_port", 9090)
 
         servers: dict[str, ServerConfig] = {}
         for name, srv in raw.get("servers", {}).items():
@@ -120,7 +135,14 @@ class ProxyConfig:
                 tool_token_limits=tool_token_limits,
             )
 
-        return cls(servers=servers, host=host, port=port, multi_upstream=True)
+        return cls(
+            servers=servers,
+            host=host,
+            port=port,
+            multi_upstream=True,
+            metrics_enabled=metrics_enabled,
+            metrics_port=metrics_port,
+        )
 
     @classmethod
     def load(cls) -> "ProxyConfig":

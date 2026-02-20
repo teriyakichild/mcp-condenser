@@ -51,6 +51,7 @@ from mcp.types import TextContent
 
 from mcp_condenser.condenser import condense_json, toon_encode_json, stats, count_tokens, parse_input, truncate_to_token_limit
 from mcp_condenser.config import ProxyConfig, ServerConfig
+from mcp_condenser.metrics import MetricsRecorder, NoopRecorder, create_recorder, timer
 
 
 class CondenserMiddleware(Middleware):
@@ -60,16 +61,25 @@ class CondenserMiddleware(Middleware):
         self,
         server_configs: dict[str, ServerConfig],
         tool_server_map: dict[str, str] | None = None,
+        metrics: MetricsRecorder | None = None,
     ):
         """
         Args:
             server_configs: Map of server name → ServerConfig.
             tool_server_map: Map of tool name → server name. When None,
                 uses the first (only) server config for all tools.
+            metrics: Metrics recorder (NoopRecorder when None).
         """
         super().__init__()
         self.server_configs = server_configs
         self.tool_server_map = tool_server_map
+        self.metrics: MetricsRecorder = metrics or NoopRecorder()
+
+    def _resolve_server_name(self, tool_name: str) -> str:
+        """Map a tool name to its server name for metric labels."""
+        if self.tool_server_map is not None:
+            return self.tool_server_map.get(tool_name, "unknown")
+        return next(iter(self.server_configs), "default")
 
     def _resolve_server_config(self, tool_name: str) -> ServerConfig | None:
         """Map a tool name back to its ServerConfig."""
@@ -112,9 +122,12 @@ class CondenserMiddleware(Middleware):
 
         Returns (condensed_text, mode) or None if no condensing was applied.
         """
+        server_name = self._resolve_server_name(tool_name)
+
         try:
             data, input_fmt = parse_input(text)
         except ValueError:
+            self.metrics.record_request(tool_name, server_name, "passthrough")
             return None
 
         orig_tokens = count_tokens(text)
@@ -127,6 +140,7 @@ class CondenserMiddleware(Middleware):
                 f"({cfg.min_token_threshold:,})",
                 file=sys.stderr,
             )
+            self.metrics.record_request(tool_name, server_name, "skipped")
             return None
 
         base_name = self._base_tool_name(tool_name)
@@ -134,7 +148,7 @@ class CondenserMiddleware(Middleware):
         # 1. TOON_ONLY → direct TOON encoding
         if base_name in cfg.toon_only_tools:
             condensed = toon_encode_json(data)
-            mode = "toon-only"
+            mode = "toon_only"
         # 2. CONDENSE (or *) → full pipeline
         elif cfg.tools is None or base_name in cfg.tools:
             condensed = condense_json(data)
@@ -142,9 +156,10 @@ class CondenserMiddleware(Middleware):
         # 3. TOON_FALLBACK → direct TOON encoding
         elif cfg.toon_fallback:
             condensed = toon_encode_json(data)
-            mode = "toon-fallback"
+            mode = "toon_fallback"
         # 4. No match
         else:
+            self.metrics.record_request(tool_name, server_name, "passthrough")
             return None
 
         s = stats(text, condensed, orig_tok=orig_tokens)
@@ -157,6 +172,7 @@ class CondenserMiddleware(Middleware):
                 f"original {s['orig_tok']:,} tokens",
                 file=sys.stderr,
             )
+            self.metrics.record_request(tool_name, server_name, "reverted")
             return None
 
         print(
@@ -165,6 +181,14 @@ class CondenserMiddleware(Middleware):
             f"({s['tok_pct']}% reduction)",
             file=sys.stderr,
         )
+
+        self.metrics.record_request(tool_name, server_name, mode)
+        self.metrics.record_tokens(tool_name, server_name, s["orig_tok"], s["cond_tok"])
+        if s["orig_tok"] > 0:
+            self.metrics.record_compression_ratio(
+                tool_name, server_name, s["cond_tok"] / s["orig_tok"]
+            )
+
         return condensed, mode
 
     async def on_list_tools(self, context, call_next):
@@ -181,14 +205,21 @@ class CondenserMiddleware(Middleware):
 
         cfg = self._resolve_server_config(tool_name)
         if not cfg or not cfg.condense:
+            server_name = self._resolve_server_name(tool_name)
+            self.metrics.record_request(tool_name, server_name, "passthrough")
             return result
+
+        server_name = self._resolve_server_name(tool_name)
 
         condensed_any = False
         for item in result.content:
             if not isinstance(item, TextContent):
                 continue
 
-            condensed_result = self._condense_item(item.text, tool_name, cfg)
+            with timer() as elapsed:
+                condensed_result = self._condense_item(item.text, tool_name, cfg)
+            self.metrics.record_processing_seconds(tool_name, server_name, elapsed())
+
             if condensed_result is not None:
                 item.text = condensed_result[0]
                 condensed_any = True
@@ -207,6 +238,7 @@ class CondenserMiddleware(Middleware):
                 truncated = truncate_to_token_limit(item.text, effective_limit)
                 if truncated is not item.text:
                     item.text = truncated
+                    self.metrics.record_truncation(tool_name, server_name)
                     print(
                         f"[condenser] {tool_name}: truncated to "
                         f"{effective_limit} token limit",
@@ -218,20 +250,22 @@ class CondenserMiddleware(Middleware):
 
 def main():
     config = ProxyConfig.load()
+    metrics = create_recorder(enabled=config.metrics_enabled, port=config.metrics_port)
 
     if config.multi_upstream:
-        _run_multi_upstream(config)
+        _run_multi_upstream(config, metrics)
     else:
-        _run_single_upstream(config)
+        _run_single_upstream(config, metrics)
 
 
-def _run_single_upstream(config: ProxyConfig):
+def _run_single_upstream(config: ProxyConfig, metrics: MetricsRecorder):
     """Single-upstream mode: same as legacy behavior."""
     srv_cfg = config.servers["default"]
 
     proxy = FastMCP.as_proxy(srv_cfg.url)
     proxy.add_middleware(CondenserMiddleware(
         server_configs=config.servers,
+        metrics=metrics,
     ))
 
     condense_tools_desc = "*" if srv_cfg.tools is None else ",".join(srv_cfg.tools)
@@ -247,11 +281,13 @@ def _run_single_upstream(config: ProxyConfig):
     print(f"  max-token-limit: {srv_cfg.max_token_limit or 'off'}", file=sys.stderr)
     ttl_desc = ",".join(f"{k}:{v}" for k, v in srv_cfg.tool_token_limits.items()) or "(none)"
     print(f"  tool-token-limits: {ttl_desc}", file=sys.stderr)
+    if config.metrics_enabled:
+        print(f"  metrics: http://0.0.0.0:{config.metrics_port}/metrics", file=sys.stderr)
 
     proxy.run(transport="streamable-http", host=config.host, port=config.port)
 
 
-def _run_multi_upstream(config: ProxyConfig):
+def _run_multi_upstream(config: ProxyConfig, metrics: MetricsRecorder):
     """Multi-upstream mode: aggregate tools from multiple upstreams."""
     from fastmcp.client.client import Client
     from fastmcp.server.proxy import ProxyTool
@@ -293,6 +329,7 @@ def _run_multi_upstream(config: ProxyConfig):
     app.add_middleware(CondenserMiddleware(
         server_configs=config.servers,
         tool_server_map=tool_server_map,
+        metrics=metrics,
     ))
 
     print(f"MCP condenser proxy starting on {config.host}:{config.port}", file=sys.stderr)
@@ -300,6 +337,8 @@ def _run_multi_upstream(config: ProxyConfig):
     for name, srv_cfg in config.servers.items():
         tools_desc = "*" if srv_cfg.tools is None else ",".join(srv_cfg.tools)
         print(f"  [{name}] {srv_cfg.url} — tools: {tools_desc}, condense: {srv_cfg.condense}", file=sys.stderr)
+    if config.metrics_enabled:
+        print(f"  metrics: http://0.0.0.0:{config.metrics_port}/metrics", file=sys.stderr)
 
     app.run(transport="streamable-http", host=config.host, port=config.port)
 

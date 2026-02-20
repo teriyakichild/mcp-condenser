@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mcp-condenser
+description: MCP proxy that condenses verbose JSON tool responses
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

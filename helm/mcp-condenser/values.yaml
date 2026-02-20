@@ -1,0 +1,34 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/logdna/mcp-condenser
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 9000
+
+env: {}
+  # UPSTREAM_MCP_URL: "http://upstream:8080/mcp"
+  # CONDENSE_TOOLS: "*"
+
+metrics:
+  enabled: false
+  port: 9090
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+
+resources: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
