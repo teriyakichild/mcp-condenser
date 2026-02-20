@@ -147,21 +147,21 @@ docker run -e UPSTREAM_MCP_URL=http://host.docker.internal:8080/mcp mcp-condense
 
 ## Helm
 
-A Helm chart is included under `chart/`:
+A Helm chart is included under `helm/mcp-condenser/`:
 
 ```bash
-helm install mcp-condenser ./chart \
+helm install mcp-condenser ./helm/mcp-condenser \
   --set config.upstreamMcpUrl=http://upstream:8080/mcp
 ```
 
 For multi-upstream mode, provide a config JSON:
 
 ```bash
-helm install mcp-condenser ./chart \
+helm install mcp-condenser ./helm/mcp-condenser \
   --set-json 'config.condenserConfig={"servers":{"k8s":{"url":"http://k8s:8080/mcp"}}}'
 ```
 
-See `chart/values.yaml` for all configurable values.
+See `helm/mcp-condenser/values.yaml` for all configurable values.
 
 ## Development
 

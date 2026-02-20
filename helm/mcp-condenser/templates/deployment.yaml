@@ -11,8 +11,15 @@ spec:
       {{- include "mcp-condenser.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
         {{- include "mcp-condenser.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -24,7 +31,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
+              containerPort: {{ .Values.config.proxyPort }}
               protocol: TCP
             {{- if .Values.metrics.enabled }}
             - name: metrics
@@ -32,8 +39,31 @@ spec:
               protocol: TCP
             {{- end }}
           env:
+            {{- if .Values.config.condenserConfig }}
+            - name: CONDENSER_CONFIG
+              value: /etc/mcp-condenser/config.json
+            {{- else }}
+            - name: UPSTREAM_MCP_URL
+              value: {{ required "config.upstreamMcpUrl is required (or set config.condenserConfig)" .Values.config.upstreamMcpUrl | quote }}
+            {{- end }}
+            - name: CONDENSE_TOOLS
+              value: {{ .Values.config.condenseTools | quote }}
+            - name: TOON_ONLY_TOOLS
+              value: {{ .Values.config.toonOnlyTools | quote }}
+            - name: TOON_FALLBACK
+              value: {{ .Values.config.toonFallback | quote }}
+            - name: MIN_TOKEN_THRESHOLD
+              value: {{ .Values.config.minTokenThreshold | quote }}
+            - name: REVERT_IF_LARGER
+              value: {{ .Values.config.revertIfLarger | quote }}
+            - name: MAX_TOKEN_LIMIT
+              value: {{ .Values.config.maxTokenLimit | quote }}
+            - name: TOOL_TOKEN_LIMITS
+              value: {{ .Values.config.toolTokenLimits | quote }}
+            - name: PROXY_HOST
+              value: "0.0.0.0"
             - name: PROXY_PORT
-              value: {{ .Values.service.port | quote }}
+              value: {{ .Values.config.proxyPort | quote }}
             {{- if .Values.metrics.enabled }}
             - name: METRICS_ENABLED
               value: "true"
@@ -44,10 +74,32 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- if .Values.config.condenserConfig }}
+          volumeMounts:
+            - name: condenser-config
+              mountPath: /etc/mcp-condenser
+              readOnly: true
+          {{- end }}
+      {{- if .Values.config.condenserConfig }}
+      volumes:
+        - name: condenser-config
+          configMap:
+            name: {{ include "mcp-condenser.fullname" . }}-config
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
