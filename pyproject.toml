@@ -41,5 +41,17 @@ pythonpath = ["."]
 [dependency-groups]
 dev = ["pytest>=8.0"]
 
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+branch = "master"
+commit_message = "chore(release): {version}"
+build_command = false
+
+[tool.semantic_release.changelog]
+generate = true
+
+[tool.semantic_release.remote]
+type = "github"
+
 [tool.uv.sources]
 toon-format = { git = "https://github.com/toon-format/toon-python.git" }
