@@ -1,0 +1,10 @@
+{{- if .Values.config.condenserConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mcp-condenser.fullname" . }}-config
+  labels:
+    {{- include "mcp-condenser.labels" . | nindent 4 }}
+data:
+  config.json: {{ .Values.config.condenserConfig | quote }}
+{{- end }}

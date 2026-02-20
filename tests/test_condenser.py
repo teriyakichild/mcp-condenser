@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 import pytest
 
-from condenser import classify, flatten, is_homogeneous_array, condense_json, toon_encode_json, parse_input, truncate_to_token_limit, count_tokens
+from mcp_condenser.condenser import classify, flatten, is_homogeneous_array, condense_json, toon_encode_json, parse_input, truncate_to_token_limit, count_tokens
 
 
 class TestClassify:

@@ -34,8 +34,13 @@ spec:
               containerPort: {{ .Values.config.proxyPort }}
               protocol: TCP
           env:
+            {{- if .Values.config.condenserConfig }}
+            - name: CONDENSER_CONFIG
+              value: /etc/mcp-condenser/config.json
+            {{- else }}
             - name: UPSTREAM_MCP_URL
-              value: {{ required "config.upstreamMcpUrl is required" .Values.config.upstreamMcpUrl | quote }}
+              value: {{ required "config.upstreamMcpUrl is required (or set config.condenserConfig)" .Values.config.upstreamMcpUrl | quote }}
+            {{- end }}
             - name: CONDENSE_TOOLS
               value: {{ .Values.config.condenseTools | quote }}
             - name: TOON_ONLY_TOOLS
@@ -68,6 +73,18 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- if .Values.config.condenserConfig }}
+          volumeMounts:
+            - name: condenser-config
+              mountPath: /etc/mcp-condenser
+              readOnly: true
+          {{- end }}
+      {{- if .Values.config.condenserConfig }}
+      volumes:
+        - name: condenser-config
+          configMap:
+            name: {{ include "mcp-condenser.fullname" . }}-config
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

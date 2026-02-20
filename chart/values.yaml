@@ -10,7 +10,8 @@ nameOverride: ""
 fullnameOverride: ""
 
 config:
-  upstreamMcpUrl: ""  # required — URL of the upstream MCP server
+  # Single-upstream mode (set upstreamMcpUrl)
+  upstreamMcpUrl: ""  # required unless condenserConfig is set
   condenseTools: "*"  # comma-separated tool names, or * for all
   toonOnlyTools: ""   # comma-separated tool names for direct TOON encoding (no preprocessing)
   toonFallback: "true"  # convert unmatched JSON results to TOON by default
@@ -19,6 +20,10 @@ config:
   maxTokenLimit: "0"  # global default token cap for all tool responses (0 = off)
   toolTokenLimits: ""  # comma-separated tool_name:limit pairs for per-tool overrides
   proxyPort: 9000
+
+  # Multi-upstream mode (set condenserConfig to JSON config content)
+  # When set, overrides upstreamMcpUrl and uses the config file for all settings.
+  condenserConfig: ""  # JSON string — see README for schema
 
 service:
   type: ClusterIP

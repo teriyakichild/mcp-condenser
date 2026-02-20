@@ -7,10 +7,11 @@ WORKDIR /app
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-install-project
 
-COPY condenser.py mcp_proxy.py ./
+COPY README.md ./
+COPY mcp_condenser/ mcp_condenser/
 
 ENV PROXY_HOST=0.0.0.0
 ENV PROXY_PORT=9000
 EXPOSE 9000
 
-ENTRYPOINT ["uv", "run", "python", "mcp_proxy.py"]
+ENTRYPOINT ["uv", "run", "mcp-condenser-proxy"]

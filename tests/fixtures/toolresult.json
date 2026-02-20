@@ -1,0 +1,1267 @@
+{
+  "node": {
+    "cpu": {
+      "psi": {
+        "full": {
+          "avg10": 0,
+          "avg300": 0,
+          "avg60": 0,
+          "total": 0
+        },
+        "some": {
+          "avg10": 1.79,
+          "avg300": 2.73,
+          "avg60": 1.92,
+          "total": 184433623719
+        }
+      },
+      "time": "2026-02-15T21:24:51Z",
+      "usageCoreNanoSeconds": 514779144835000,
+      "usageNanoCores": 109515769
+    },
+    "fs": {
+      "availableBytes": 29417222144,
+      "capacityBytes": 40571502592,
+      "inodes": 19843072,
+      "inodesFree": 19687905,
+      "inodesUsed": 155167,
+      "time": "2026-02-15T21:24:51Z",
+      "usedBytes": 11154280448
+    },
+    "io": {
+      "psi": {
+        "full": {
+          "avg10": 0.14,
+          "avg300": 0,
+          "avg60": 0.03,
+          "total": 2063560066
+        },
+        "some": {
+          "avg10": 0.14,
+          "avg300": 0,
+          "avg60": 0.03,
+          "total": 3703984407
+        }
+      },
+      "time": "2026-02-15T21:24:51Z"
+    },
+    "memory": {
+      "availableBytes": 4526592000,
+      "majorPageFaults": 47977665,
+      "pageFaults": 29920177284,
+      "psi": {
+        "full": {
+          "avg10": 0,
+          "avg300": 0,
+          "avg60": 0,
+          "total": 208943561
+        },
+        "some": {
+          "avg10": 0,
+          "avg300": 0,
+          "avg60": 0,
+          "total": 505650068
+        }
+      },
+      "rssBytes": 2135183360,
+      "time": "2026-02-15T21:24:51Z",
+      "usageBytes": 6024900608,
+      "workingSetBytes": 3740188672
+    },
+    "network": {
+      "interfaces": [
+        {
+          "name": "bond0",
+          "rxBytes": 0,
+          "rxErrors": 0,
+          "txBytes": 0,
+          "txErrors": 0
+        },
+        {
+          "name": "dummy0",
+          "rxBytes": 0,
+          "rxErrors": 0,
+          "txBytes": 0,
+          "txErrors": 0
+        },
+        {
+          "name": "teql0",
+          "rxBytes": 0,
+          "rxErrors": 0,
+          "txBytes": 0,
+          "txErrors": 0
+        },
+        {
+          "name": "tunl0",
+          "rxBytes": 0,
+          "rxErrors": 0,
+          "txBytes": 0,
+          "txErrors": 0
+        },
+        {
+          "name": "sit0",
+          "rxBytes": 0,
+          "rxErrors": 0,
+          "txBytes": 0,
+          "txErrors": 0
+        },
+        {
+          "name": "ip6tnl0",
+          "rxBytes": 0,
+          "rxErrors": 0,
+          "txBytes": 0,
+          "txErrors": 0
+        },
+        {
+          "name": "enp0s2",
+          "rxBytes": 72253646569,
+          "rxErrors": 0,
+          "txBytes": 42376939370,
+          "txErrors": 0
+        },
+        {
+          "name": "cilium_net",
+          "rxBytes": 24278,
+          "rxErrors": 0,
+          "txBytes": 19760,
+          "txErrors": 0
+        },
+        {
+          "name": "cilium_host",
+          "rxBytes": 19760,
+          "rxErrors": 0,
+          "txBytes": 24278,
+          "txErrors": 0
+        },
+        {
+          "name": "cilium_vxlan",
+          "rxBytes": 21003873241,
+          "rxErrors": 0,
+          "txBytes": 8407973715,
+          "txErrors": 0
+        },
+        {
+          "name": "lxc_health",
+          "rxBytes": 33750419,
+          "rxErrors": 0,
+          "txBytes": 40557727,
+          "txErrors": 0
+        },
+        {
+          "name": "lxc924062795151",
+          "rxBytes": 161321892,
+          "rxErrors": 0,
+          "txBytes": 92888936,
+          "txErrors": 0
+        },
+        {
+          "name": "lxc2398e05f6a03",
+          "rxBytes": 149230699,
+          "rxErrors": 0,
+          "txBytes": 149117128,
+          "txErrors": 0
+        },
+        {
+          "name": "lxc80e79c248a45",
+          "rxBytes": 6165179469,
+          "rxErrors": 0,
+          "txBytes": 3558384445,
+          "txErrors": 0
+        },
+        {
+          "name": "lxcb9cbc8dee7f8",
+          "rxBytes": 1039421429,
+          "rxErrors": 0,
+          "txBytes": 646263172,
+          "txErrors": 0
+        },
+        {
+          "name": "lxc076428c9fb93",
+          "rxBytes": 72168892,
+          "rxErrors": 0,
+          "txBytes": 118668967,
+          "txErrors": 0
+        },
+        {
+          "name": "lxca7eda23b5979",
+          "rxBytes": 1191653020,
+          "rxErrors": 0,
+          "txBytes": 2284533809,
+          "txErrors": 0
+        },
+        {
+          "name": "lxc5494f16726cb",
+          "rxBytes": 365700551,
+          "rxErrors": 0,
+          "txBytes": 325096575,
+          "txErrors": 0
+        },
+        {
+          "name": "lxc085a6e9f5d92",
+          "rxBytes": 635003118,
+          "rxErrors": 0,
+          "txBytes": 147601407,
+          "txErrors": 0
+        },
+        {
+          "name": "lxcdedd84da42a4",
+          "rxBytes": 783874556,
+          "rxErrors": 0,
+          "txBytes": 1547772141,
+          "txErrors": 0
+        },
+        {
+          "name": "lxca3ce4dba24ae",
+          "rxBytes": 16332553,
+          "rxErrors": 0,
+          "txBytes": 17408469,
+          "txErrors": 0
+        },
+        {
+          "name": "lxcdf63e9fb75bc",
+          "rxBytes": 8653563,
+          "rxErrors": 0,
+          "txBytes": 9386690,
+          "txErrors": 0
+        },
+        {
+          "name": "lxcdbfbba414504",
+          "rxBytes": 107180,
+          "rxErrors": 0,
+          "txBytes": 514645,
+          "txErrors": 0
+        }
+      ],
+      "name": "",
+      "time": "2026-02-15T21:24:51Z"
+    },
+    "nodeName": "talos-default-worker-1",
+    "rlimit": {
+      "curproc": 789,
+      "maxpid": 62401,
+      "time": "2026-02-15T21:24:55Z"
+    },
+    "runtime": {
+      "containerFs": {
+        "availableBytes": 29417222144,
+        "capacityBytes": 40571502592,
+        "inodes": 19843072,
+        "inodesFree": 19687905,
+        "inodesUsed": 147582,
+        "time": "2026-02-15T21:24:51Z",
+        "usedBytes": 9845604352
+      },
+      "imageFs": {
+        "availableBytes": 29417222144,
+        "capacityBytes": 40571502592,
+        "inodes": 19843072,
+        "inodesFree": 19687905,
+        "inodesUsed": 147582,
+        "time": "2026-02-15T21:24:51Z",
+        "usedBytes": 9845604352
+      }
+    },
+    "startTime": "2026-02-04T14:09:07Z",
+    "swap": {
+      "swapAvailableBytes": 0,
+      "swapUsageBytes": 0,
+      "time": "2026-02-15T21:24:51Z"
+    },
+    "systemContainers": [
+      {
+        "cpu": {
+          "psi": {
+            "full": {
+              "avg10": 0.53,
+              "avg300": 0.99,
+              "avg60": 0.5,
+              "total": 16209962850
+            },
+            "some": {
+              "avg10": 1.01,
+              "avg300": 1.7,
+              "avg60": 1.15,
+              "total": 175327314864
+            }
+          },
+          "time": "2026-02-15T21:24:52Z",
+          "usageCoreNanoSeconds": 489372715587000,
+          "usageNanoCores": 94557022
+        },
+        "io": {
+          "psi": {
+            "full": {
+              "avg10": 0.18,
+              "avg300": 0,
+              "avg60": 0.03,
+              "total": 2063256135
+            },
+            "some": {
+              "avg10": 0.18,
+              "avg300": 0,
+              "avg60": 0.03,
+              "total": 3600961933
+            }
+          },
+          "time": "2026-02-15T21:24:52Z"
+        },
+        "memory": {
+          "availableBytes": 5228896256,
+          "majorPageFaults": 47957807,
+          "pageFaults": 29793934996,
+          "psi": {
+            "full": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0,
+              "total": 210694153
+            },
+            "some": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0,
+              "total": 503588712
+            }
+          },
+          "rssBytes": 1826369536,
+          "time": "2026-02-15T21:24:52Z",
+          "usageBytes": 2781421568,
+          "workingSetBytes": 2635231232
+        },
+        "name": "pods",
+        "startTime": "2026-02-04T14:09:23Z",
+        "swap": {
+          "swapUsageBytes": 0,
+          "time": "2026-02-15T21:24:52Z"
+        }
+      },
+      {
+        "cpu": {
+          "psi": {
+            "full": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0,
+              "total": 3164430616
+            },
+            "some": {
+              "avg10": 0,
+              "avg300": 0.03,
+              "avg60": 0.01,
+              "total": 4668789488
+            }
+          },
+          "time": "2026-02-15T21:24:51Z",
+          "usageCoreNanoSeconds": 11293476566000,
+          "usageNanoCores": 19237372
+        },
+        "io": {
+          "psi": {
+            "full": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0,
+              "total": 117817
+            },
+            "some": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0,
+              "total": 139752
+            }
+          },
+          "time": "2026-02-15T21:24:51Z"
+        },
+        "memory": {
+          "majorPageFaults": 29,
+          "pageFaults": 9587346,
+          "psi": {
+            "full": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0,
+              "total": 408
+            },
+            "some": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0,
+              "total": 614
+            }
+          },
+          "rssBytes": 53256192,
+          "time": "2026-02-15T21:24:51Z",
+          "usageBytes": 76328960,
+          "workingSetBytes": 64536576
+        },
+        "name": "kubelet",
+        "startTime": "2026-02-09T02:14:38Z",
+        "swap": {
+          "swapAvailableBytes": 0,
+          "swapUsageBytes": 0,
+          "time": "2026-02-15T21:24:51Z"
+        }
+      },
+      {
+        "cpu": {
+          "psi": {
+            "full": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0.01,
+              "total": 3105076724
+            },
+            "some": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0.01,
+              "total": 3695244142
+            }
+          },
+          "time": "2026-02-15T21:24:40Z",
+          "usageCoreNanoSeconds": 5765896473000,
+          "usageNanoCores": 5386098
+        },
+        "io": {
+          "psi": {
+            "full": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0,
+              "total": 137311
+            },
+            "some": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0,
+              "total": 152751
+            }
+          },
+          "time": "2026-02-15T21:24:40Z"
+        },
+        "memory": {
+          "majorPageFaults": 468,
+          "pageFaults": 1447454,
+          "psi": {
+            "full": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0,
+              "total": 0
+            },
+            "some": {
+              "avg10": 0,
+              "avg300": 0,
+              "avg60": 0,
+              "total": 0
+            }
+          },
+          "rssBytes": 52469760,
+          "time": "2026-02-15T21:24:40Z",
+          "usageBytes": 163725312,
+          "workingSetBytes": 99422208
+        },
+        "name": "misc",
+        "startTime": "2026-02-04T14:09:08Z",
+        "swap": {
+          "swapUsageBytes": 0,
+          "time": "2026-02-15T21:24:40Z"
+        }
+      }
+    ]
+  },
+  "pods": [
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0.01,
+            "avg60": 0,
+            "total": 46550903907
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0.02,
+            "avg60": 0,
+            "total": 47246768916
+          }
+        },
+        "time": "2026-02-15T21:24:48Z",
+        "usageCoreNanoSeconds": 9863604577000,
+        "usageNanoCores": 12501000
+      },
+      "memory": {
+        "majorPageFaults": 0,
+        "pageFaults": 467161,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 71749632,
+        "time": "2026-02-15T21:24:48Z",
+        "usageBytes": 75616256,
+        "workingSetBytes": 75153408
+      },
+      "podRef": {
+        "name": "llm-7779b6d865-ttdc2",
+        "namespace": "ecommerce-prod",
+        "uid": "92e8c144-bb58-4e12-b16f-4ecee4201876"
+      },
+      "startTime": "2026-02-07T00:24:04Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 3701411627
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 4003673189
+          }
+        },
+        "time": "2026-02-15T21:24:43Z",
+        "usageCoreNanoSeconds": 7524068392000,
+        "usageNanoCores": 8620839
+      },
+      "memory": {
+        "availableBytes": 24383488,
+        "majorPageFaults": 51695,
+        "pageFaults": 3856924,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 1158135
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 1380988
+          }
+        },
+        "rssBytes": 580886528,
+        "time": "2026-02-15T21:24:43Z",
+        "usageBytes": 620650496,
+        "workingSetBytes": 604762112
+      },
+      "podRef": {
+        "name": "kafka-55574fc6d7-qxnmd",
+        "namespace": "ecommerce-prod",
+        "uid": "d95dcac7-cff5-4400-a999-b7c209238440"
+      },
+      "startTime": "2026-02-07T00:24:04Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 1425683128
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 1445924767
+          }
+        },
+        "time": "2026-02-15T21:24:44Z",
+        "usageCoreNanoSeconds": 218132472000,
+        "usageNanoCores": 47862
+      },
+      "memory": {
+        "majorPageFaults": 22,
+        "pageFaults": 19154255,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 15560704,
+        "time": "2026-02-15T21:24:44Z",
+        "usageBytes": 28766208,
+        "workingSetBytes": 28766208
+      },
+      "podRef": {
+        "name": "kube-proxy-mb7h6",
+        "namespace": "kube-system",
+        "uid": "a468851c-a1e4-4ab3-8f73-45829b68c4a6"
+      },
+      "startTime": "2026-02-04T14:10:34Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0.23,
+            "avg60": 0.02,
+            "total": 2090884
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0.23,
+            "avg60": 0.02,
+            "total": 2132449
+          }
+        },
+        "time": "2026-02-15T21:24:44Z",
+        "usageCoreNanoSeconds": 413095000,
+        "usageNanoCores": 435362
+      },
+      "memory": {
+        "availableBytes": 119693312,
+        "majorPageFaults": 0,
+        "pageFaults": 7583,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 13533184,
+        "time": "2026-02-15T21:24:44Z",
+        "usageBytes": 14524416,
+        "workingSetBytes": 14524416
+      },
+      "podRef": {
+        "name": "kubernetes-mcp-server-77f4fbb899-9tvcs",
+        "namespace": "kubernetes-mcp-server",
+        "uid": "797a1084-0eab-40bb-af21-47d0ac6cabb8"
+      },
+      "startTime": "2026-02-15T21:20:04Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 12304827
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 12437471
+          }
+        },
+        "time": "2026-02-15T21:24:48Z",
+        "usageCoreNanoSeconds": 99695549000,
+        "usageNanoCores": 2163692
+      },
+      "memory": {
+        "availableBytes": 8566435840,
+        "majorPageFaults": 10,
+        "pageFaults": 7066,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 16883712,
+        "time": "2026-02-15T21:24:48Z",
+        "usageBytes": 23498752,
+        "workingSetBytes": 23498752
+      },
+      "podRef": {
+        "name": "aura-chat-6564f678bb-56qzx",
+        "namespace": "aura",
+        "uid": "f932bd5d-f992-432d-b328-c3fecbef1699"
+      },
+      "startTime": "2026-02-12T21:51:51Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 2887833790
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 3164721657
+          }
+        },
+        "time": "2026-02-15T21:24:51Z",
+        "usageCoreNanoSeconds": 5027935081000,
+        "usageNanoCores": 6075614
+      },
+      "memory": {
+        "availableBytes": 474542080,
+        "majorPageFaults": 22,
+        "pageFaults": 1700978,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 39661568,
+        "time": "2026-02-15T21:24:51Z",
+        "usageBytes": 52400128,
+        "workingSetBytes": 49745920
+      },
+      "podRef": {
+        "name": "recommendation-868f989f99-nrxn4",
+        "namespace": "ecommerce-prod",
+        "uid": "433b6345-7895-47fb-982f-5b5383df1ac2"
+      },
+      "startTime": "2026-02-07T10:37:47Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 2728032034
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 3825831804
+          }
+        },
+        "time": "2026-02-15T21:24:52Z",
+        "usageCoreNanoSeconds": 8418909843000,
+        "usageNanoCores": 10389667
+      },
+      "memory": {
+        "availableBytes": 31227904,
+        "majorPageFaults": 25,
+        "pageFaults": 40058570,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 12759
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 24435
+          }
+        },
+        "rssBytes": 144392192,
+        "time": "2026-02-15T21:24:52Z",
+        "usageBytes": 193757184,
+        "workingSetBytes": 178487296
+      },
+      "podRef": {
+        "name": "otel-collector-agent-htb4x",
+        "namespace": "ecommerce-prod",
+        "uid": "7a59375c-b9a4-49cb-8b7a-2d6e8a52e65d"
+      },
+      "startTime": "2026-02-07T00:24:02Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 224534
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 274073
+          }
+        },
+        "time": "2026-02-15T21:24:49Z",
+        "usageCoreNanoSeconds": 57744050000,
+        "usageNanoCores": 408729
+      },
+      "memory": {
+        "availableBytes": 4255100928,
+        "majorPageFaults": 0,
+        "pageFaults": 12352,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 38289408,
+        "time": "2026-02-15T21:24:49Z",
+        "usageBytes": 40267776,
+        "workingSetBytes": 39866368
+      },
+      "podRef": {
+        "name": "aura-orchestration-59cdd5f88f-q6ftw",
+        "namespace": "aura",
+        "uid": "a137863b-9925-4883-af2e-01cd6ee67a6a"
+      },
+      "startTime": "2026-02-14T01:44:49Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 5349439195
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 5403429538
+          }
+        },
+        "time": "2026-02-15T21:24:48Z",
+        "usageCoreNanoSeconds": 636429786000,
+        "usageNanoCores": 459725
+      },
+      "memory": {
+        "majorPageFaults": 19,
+        "pageFaults": 96690,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 23236608,
+        "time": "2026-02-15T21:24:48Z",
+        "usageBytes": 57167872,
+        "workingSetBytes": 57167872
+      },
+      "podRef": {
+        "name": "cert-manager-5b44c9dc6d-lhtcv",
+        "namespace": "cert-manager",
+        "uid": "0a9f2f08-27c7-4d45-b301-58e65ba4709b"
+      },
+      "startTime": "2026-02-05T02:05:36Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 16602950658
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 16985959480
+          }
+        },
+        "time": "2026-02-15T21:24:40Z",
+        "usageCoreNanoSeconds": 3384518293000,
+        "usageNanoCores": 5891582
+      },
+      "memory": {
+        "majorPageFaults": 47,
+        "pageFaults": 131190445,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 52600832,
+        "time": "2026-02-15T21:24:40Z",
+        "usageBytes": 99061760,
+        "workingSetBytes": 92602368
+      },
+      "podRef": {
+        "name": "metallb-speaker-slpt5",
+        "namespace": "metallb-system",
+        "uid": "3313490a-310e-40ee-a3f3-b002a982cd20"
+      },
+      "startTime": "2026-02-08T23:13:17Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 659486776
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 803891917
+          }
+        },
+        "time": "2026-02-15T21:24:54Z",
+        "usageCoreNanoSeconds": 1623891794000,
+        "usageNanoCores": 2509336
+      },
+      "memory": {
+        "availableBytes": 407470080,
+        "majorPageFaults": 0,
+        "pageFaults": 17447409,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 114216960,
+        "time": "2026-02-15T21:24:54Z",
+        "usageBytes": 116822016,
+        "workingSetBytes": 116817920
+      },
+      "podRef": {
+        "name": "logdna-agent-zfx42",
+        "namespace": "logdna",
+        "uid": "d6121028-8cbc-4f9b-8a4a-077139981e27"
+      },
+      "startTime": "2026-02-07T15:35:27Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 22378284737
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 22450768230
+          }
+        },
+        "time": "2026-02-15T21:24:50Z",
+        "usageCoreNanoSeconds": 3171135220000,
+        "usageNanoCores": 3515854
+      },
+      "memory": {
+        "majorPageFaults": 12,
+        "pageFaults": 7028,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 14905344,
+        "time": "2026-02-15T21:24:50Z",
+        "usageBytes": 31539200,
+        "workingSetBytes": 31539200
+      },
+      "podRef": {
+        "name": "cilium-envoy-rlfmm",
+        "namespace": "kube-system",
+        "uid": "d39d5fbf-e0a6-405d-a6c3-01f0bad86791"
+      },
+      "startTime": "2026-02-04T14:11:51Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0.11,
+            "avg60": 0.02,
+            "total": 13246239541
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0.19,
+            "avg60": 0.04,
+            "total": 15317151002
+          }
+        },
+        "time": "2026-02-15T21:24:50Z",
+        "usageCoreNanoSeconds": 37017225548000,
+        "usageNanoCores": 26290963
+      },
+      "memory": {
+        "majorPageFaults": 65,
+        "pageFaults": 12450645,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 136196096,
+        "time": "2026-02-15T21:24:50Z",
+        "usageBytes": 283295744,
+        "workingSetBytes": 283275264
+      },
+      "podRef": {
+        "name": "cilium-8z7hq",
+        "namespace": "kube-system",
+        "uid": "2ccb3716-9175-408c-86a7-90e778cf7920"
+      },
+      "startTime": "2026-02-04T14:11:51Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 7617930941
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 7670623004
+          }
+        },
+        "time": "2026-02-15T21:24:43Z",
+        "usageCoreNanoSeconds": 709991660000,
+        "usageNanoCores": 1016576
+      },
+      "memory": {
+        "majorPageFaults": 9,
+        "pageFaults": 311661,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 18976768,
+        "time": "2026-02-15T21:24:43Z",
+        "usageBytes": 26046464,
+        "workingSetBytes": 26046464
+      },
+      "podRef": {
+        "name": "cert-manager-cainjector-5f7cff7996-dzjfj",
+        "namespace": "cert-manager",
+        "uid": "de964c1b-1359-4b0f-abc5-81b6539ad3f2"
+      },
+      "startTime": "2026-02-05T02:05:36Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 1640480596
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 2346640570
+          }
+        },
+        "time": "2026-02-15T21:24:48Z",
+        "usageCoreNanoSeconds": 6394865162000,
+        "usageNanoCores": 1347233
+      },
+      "memory": {
+        "availableBytes": 43683840,
+        "majorPageFaults": 16,
+        "pageFaults": 157076,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 534355968,
+        "time": "2026-02-15T21:24:48Z",
+        "usageBytes": 585461760,
+        "workingSetBytes": 585461760
+      },
+      "podRef": {
+        "name": "jaeger-69ddd49ddc-7lprx",
+        "namespace": "ecommerce-prod",
+        "uid": "d0ef834c-7538-41a3-ad4d-215bfeda1a05"
+      },
+      "startTime": "2026-02-07T10:37:46Z"
+    },
+    {
+      "cpu": {
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 3829460110
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 3974100772
+          }
+        },
+        "time": "2026-02-15T21:24:39Z",
+        "usageCoreNanoSeconds": 1267212255000,
+        "usageNanoCores": 1677995
+      },
+      "memory": {
+        "majorPageFaults": 16,
+        "pageFaults": 9002848,
+        "psi": {
+          "full": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          },
+          "some": {
+            "avg10": 0,
+            "avg300": 0,
+            "avg60": 0,
+            "total": 0
+          }
+        },
+        "rssBytes": 10801152,
+        "time": "2026-02-15T21:24:39Z",
+        "usageBytes": 96595968,
+        "workingSetBytes": 12210176
+      },
+      "podRef": {
+        "name": "openebs-localpv-provisioner-6f9447fcc9-7rrpd",
+        "namespace": "openebs",
+        "uid": "1889ce44-ec8b-408b-af89-331630aa609f"
+      },
+      "startTime": "2026-02-09T01:54:53Z"
+    }
+  ]
+}

@@ -11,7 +11,7 @@ wheels/
 
 # Scratch / data files
 out
-*.json
+/*.json
 research.md
 
 # Lock file (deps pinned in pyproject.toml)
