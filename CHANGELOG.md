@@ -1,6 +1,31 @@
 # CHANGELOG
 
 
+## v0.4.1 (2026-02-20)
+
+### Bug Fixes
+
+- Fall back to METRICS_ENABLED/METRICS_PORT env vars in config file mode
+  ([`1f65f02`](https://github.com/teriyakichild/mcp-condenser/commit/1f65f02a78ad1bb09dd67e2bc3161f5f246ed1ee))
+
+from_file() ignored the environment variables for metrics settings, so deployments using
+  CONDENSER_CONFIG with env-based metrics config (e.g. Helm chart) never actually started the
+  metrics server.
+
+### Chores
+
+- Switch release workflow to manual trigger
+  ([`228119e`](https://github.com/teriyakichild/mcp-condenser/commit/228119e9d38c8ac3b8daab72088b7e365bd91527))
+
+Replace automatic release on push to master with workflow_dispatch so releases only happen when
+  explicitly triggered.
+
+### Continuous Integration
+
+- Add Docker build and push to DockerHub on release
+  ([`d249bd7`](https://github.com/teriyakichild/mcp-condenser/commit/d249bd702e692a712cd0b0dead534988067eb4be))
+
+
 ## v0.4.0 (2026-02-20)
 
 ### Features
