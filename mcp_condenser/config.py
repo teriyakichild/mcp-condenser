@@ -119,8 +119,9 @@ class ProxyConfig:
         host = global_cfg.get("host", "0.0.0.0")
         port = global_cfg.get("port", 9000)
         prefix_tools = global_cfg.get("prefix_tools", True)
-        metrics_enabled = global_cfg.get("metrics_enabled", False)
-        metrics_port = global_cfg.get("metrics_port", 9090)
+        metrics_enabled_default = os.environ.get("METRICS_ENABLED", "false").strip().lower() not in ("false", "0", "no", "")
+        metrics_enabled = global_cfg.get("metrics_enabled", metrics_enabled_default)
+        metrics_port = global_cfg.get("metrics_port", int(os.environ.get("METRICS_PORT", "9090")))
 
         servers: dict[str, ServerConfig] = {}
         for name, srv in raw.get("servers", {}).items():

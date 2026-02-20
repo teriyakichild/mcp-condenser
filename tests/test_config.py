@@ -151,6 +151,31 @@ class TestMetricsConfig:
         assert config.metrics_enabled is False
         assert config.metrics_port == 9090
 
+    def test_from_file_falls_back_to_env(self, tmp_path, monkeypatch):
+        """Env vars METRICS_ENABLED / METRICS_PORT are used when the config file omits them."""
+        monkeypatch.setenv("METRICS_ENABLED", "true")
+        monkeypatch.setenv("METRICS_PORT", "9191")
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "servers": {"s": {"url": "http://localhost/mcp"}},
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        assert config.metrics_enabled is True
+        assert config.metrics_port == 9191
+
+    def test_from_file_json_overrides_env(self, tmp_path, monkeypatch):
+        """Explicit values in the config file take precedence over env vars."""
+        monkeypatch.setenv("METRICS_ENABLED", "true")
+        monkeypatch.setenv("METRICS_PORT", "9191")
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "global": {"metrics_enabled": False, "metrics_port": 7777},
+            "servers": {"s": {"url": "http://localhost/mcp"}},
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        assert config.metrics_enabled is False
+        assert config.metrics_port == 7777
+
 
 class TestLoad:
     def test_prefers_config_file(self, tmp_path, monkeypatch):
