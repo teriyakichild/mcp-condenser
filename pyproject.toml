@@ -1,6 +1,6 @@
 [project]
 name = "mcp-condenser"
-version = "0.3.1"
+version = "0.4.0"
 description = "MCP proxy that condenses verbose JSON tool responses into compact TOON text for LLM context compression"
 readme = "README.md"
 license = "Apache-2.0"

@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.4.0 (2026-02-20)
+
+### Features
+
+- Add per-upstream headers and header forwarding
+  ([`c066862`](https://github.com/teriyakichild/mcp-condenser/commit/c066862421336f939b351e6e9ebedba9edf11dac))
+
+Support per-upstream authentication and header control via two new ServerConfig fields:
+
+- headers: static headers sent to a specific upstream (e.g. bearer tokens) - forward_headers:
+  selectively forward and rename incoming client headers per upstream, replacing the default
+  forward-everything behavior
+
+Single-upstream mode supports UPSTREAM_MCP_HEADERS env var. Helm chart updated with
+  upstreamMcpHeaders value.
+
+
 ## v0.3.1 (2026-02-20)
 
 ### Bug Fixes
