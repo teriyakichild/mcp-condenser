@@ -1,6 +1,18 @@
 # CHANGELOG
 
 
+## v0.3.1 (2026-02-20)
+
+### Bug Fixes
+
+- Consolidate duplicate helm charts into helm/mcp-condenser
+  ([`eb18b9d`](https://github.com/teriyakichild/mcp-condenser/commit/eb18b9d2ae36cba1e1499467f84825241d96d1fd))
+
+Merged chart/ and helm/mcp-condenser/ into a single chart at helm/mcp-condenser/, combining features
+  from both: structured config values, health checks, ConfigMap support, pod annotations/labels,
+  NOTES.txt, metrics/ServiceMonitor, and generic env passthrough.
+
+
 ## v0.3.0 (2026-02-20)
 
 ### Features
