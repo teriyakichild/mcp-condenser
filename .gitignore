@@ -13,6 +13,3 @@ wheels/
 out
 /*.json
 research.md
-
-# Lock file (deps pinned in pyproject.toml)
-uv.lock
