@@ -45,7 +45,7 @@ dev = ["pytest>=8.0"]
 version_toml = ["pyproject.toml:project.version"]
 branch = "master"
 commit_message = "chore(release): {version}"
-build_command = false
+build_command = ""
 
 [tool.semantic_release.changelog]
 generate = true
