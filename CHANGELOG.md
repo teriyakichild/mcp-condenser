@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.3.0 (2026-02-20)
+
+### Features
+
+- Add prefix_tools option to disable tool name prefixing in multi-upstream mode
+  ([`0a31ed8`](https://github.com/teriyakichild/mcp-condenser/commit/0a31ed8096a9d9892ea80e4dcbb455f33f574869))
+
+Adds a global `prefix_tools` config option (default: true) that controls whether tool names are
+  prefixed with the server name in multi-upstream mode. When disabled, tools are registered with
+  their original names, with collision detection at startup if two servers expose the same tool
+  name.
+
+
 ## v0.2.0 (2026-02-20)
 
 ### Continuous Integration
