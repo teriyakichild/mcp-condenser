@@ -88,13 +88,26 @@ Example `config.json`:
   },
   "global": {
     "host": "0.0.0.0",
-    "port": 9000
+    "port": 9000,
+    "prefix_tools": true
   }
 }
 ```
 
-In multi-upstream mode, tool names are prefixed with the server name
-(e.g. `k8s_get_pods`, `github_list_repos`).
+In multi-upstream mode, tool names are prefixed with the server name by default
+(e.g. `k8s_get_pods`, `github_list_repos`). Set `"prefix_tools": false` in the
+`global` section to register tools with their original names. If two servers
+expose the same tool name with prefixing disabled, startup will fail with an error.
+
+#### Global config options
+
+| Field | Default | Description |
+|---|---|---|
+| `host` | `"0.0.0.0"` | Bind host |
+| `port` | `9000` | Bind port |
+| `prefix_tools` | `true` | Prefix tool names with server name in multi-upstream mode |
+| `metrics_enabled` | `false` | Enable Prometheus metrics endpoint |
+| `metrics_port` | `9090` | Metrics endpoint port |
 
 #### Per-server config options
 

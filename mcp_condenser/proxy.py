@@ -293,6 +293,7 @@ def _run_multi_upstream(config: ProxyConfig, metrics: MetricsRecorder):
     from fastmcp.server.proxy import ProxyTool
 
     tool_server_map: dict[str, str] = {}
+    prefix_tools = config.prefix_tools
 
     @asynccontextmanager
     async def lifespan(server: FastMCP) -> AsyncIterator[None]:
@@ -306,17 +307,29 @@ def _run_multi_upstream(config: ProxyConfig, metrics: MetricsRecorder):
                 if srv_cfg.tools is not None and mcp_tool.name not in srv_cfg.tools:
                     continue
 
-                prefixed_name = f"{server_name}_{mcp_tool.name}"
+                if prefix_tools:
+                    registered_name = f"{server_name}_{mcp_tool.name}"
+                else:
+                    registered_name = mcp_tool.name
+                    # Collision detection when prefixing is disabled
+                    if registered_name in tool_server_map:
+                        existing_server = tool_server_map[registered_name]
+                        raise ValueError(
+                            f"Tool name collision: '{registered_name}' is provided by "
+                            f"both '{existing_server}' and '{server_name}'. "
+                            f"Enable prefix_tools or use the 'tools' allowlist to resolve."
+                        )
+
                 # Create a new Client for each ProxyTool (they manage their own sessions)
                 tool_client = Client(srv_cfg.url)
                 proxy_tool = ProxyTool.from_mcp_tool(tool_client, mcp_tool)
-                # ProxyTool is a pydantic model — create a copy with the prefixed name
-                proxy_tool = proxy_tool.model_copy(update={"name": prefixed_name})
+                # ProxyTool is a pydantic model — create a copy with the registered name
+                proxy_tool = proxy_tool.model_copy(update={"name": registered_name})
                 server.add_tool(proxy_tool)
-                tool_server_map[prefixed_name] = server_name
+                tool_server_map[registered_name] = server_name
 
                 print(
-                    f"  registered: {prefixed_name} (from {server_name})",
+                    f"  registered: {registered_name} (from {server_name})",
                     file=sys.stderr,
                 )
 
@@ -334,6 +347,7 @@ def _run_multi_upstream(config: ProxyConfig, metrics: MetricsRecorder):
 
     print(f"MCP condenser proxy starting on {config.host}:{config.port}", file=sys.stderr)
     print(f"  mode: multi-upstream ({len(config.servers)} servers)", file=sys.stderr)
+    print(f"  prefix-tools: {config.prefix_tools}", file=sys.stderr)
     for name, srv_cfg in config.servers.items():
         tools_desc = "*" if srv_cfg.tools is None else ",".join(srv_cfg.tools)
         print(f"  [{name}] {srv_cfg.url} — tools: {tools_desc}, condense: {srv_cfg.condense}", file=sys.stderr)

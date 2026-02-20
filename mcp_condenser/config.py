@@ -34,6 +34,7 @@ class ProxyConfig:
     host: str = "0.0.0.0"
     port: int = 9000
     multi_upstream: bool = False
+    prefix_tools: bool = True
     metrics_enabled: bool = False
     metrics_port: int = 9090
 
@@ -109,6 +110,7 @@ class ProxyConfig:
         global_cfg = raw.get("global", {})
         host = global_cfg.get("host", "0.0.0.0")
         port = global_cfg.get("port", 9000)
+        prefix_tools = global_cfg.get("prefix_tools", True)
         metrics_enabled = global_cfg.get("metrics_enabled", False)
         metrics_port = global_cfg.get("metrics_port", 9090)
 
@@ -140,6 +142,7 @@ class ProxyConfig:
             host=host,
             port=port,
             multi_upstream=True,
+            prefix_tools=prefix_tools,
             metrics_enabled=metrics_enabled,
             metrics_port=metrics_port,
         )

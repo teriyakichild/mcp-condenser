@@ -5,7 +5,7 @@ import json
 import pytest
 from prometheus_client import CollectorRegistry
 
-from mcp_condenser.config import ServerConfig
+from mcp_condenser.config import ProxyConfig, ServerConfig
 from mcp_condenser.metrics import PrometheusRecorder
 from mcp_condenser.proxy import CondenserMiddleware
 
@@ -228,3 +228,177 @@ class TestMetricsRecording:
                 "condenser_requests_total",
                 {"tool": "tool", "server": "default", "mode": "reverted"},
             ) == 1.0
+
+
+class TestPrefixToolsConfig:
+    """Tests for the prefix_tools config option."""
+
+    def test_default_is_true(self):
+        cfg = ProxyConfig(servers={})
+        assert cfg.prefix_tools is True
+
+    def test_from_file_reads_prefix_tools(self, tmp_path):
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({
+            "global": {"prefix_tools": False},
+            "servers": {
+                "k8s": {"url": "http://k8s/mcp"},
+            },
+        }))
+        cfg = ProxyConfig.from_file(str(config_file))
+        assert cfg.prefix_tools is False
+        assert cfg.multi_upstream is True
+
+    def test_from_file_defaults_prefix_tools_true(self, tmp_path):
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({
+            "servers": {
+                "k8s": {"url": "http://k8s/mcp"},
+            },
+        }))
+        cfg = ProxyConfig.from_file(str(config_file))
+        assert cfg.prefix_tools is True
+
+    def test_from_env_always_true(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        cfg = ProxyConfig.from_env()
+        assert cfg.prefix_tools is True
+
+
+class TestUnprefixedToolServerMap:
+    """Test that tool_server_map works correctly with unprefixed names."""
+
+    def test_resolve_server_config_unprefixed(self):
+        configs = {
+            "k8s": ServerConfig(url="http://k8s/mcp"),
+            "github": ServerConfig(url="http://github/mcp"),
+        }
+        # Simulate unprefixed registration: original tool names → server names
+        tool_map = {"get_pods": "k8s", "list_repos": "github"}
+        mw = CondenserMiddleware(server_configs=configs, tool_server_map=tool_map)
+
+        cfg = mw._resolve_server_config("get_pods")
+        assert cfg.url == "http://k8s/mcp"
+
+        cfg = mw._resolve_server_config("list_repos")
+        assert cfg.url == "http://github/mcp"
+
+    def test_base_tool_name_unprefixed(self):
+        """When tools aren't prefixed, _base_tool_name returns the name as-is."""
+        tool_map = {"get_pods": "k8s"}
+        mw = _make_middleware(tool_server_map=tool_map)
+        # "get_pods" doesn't start with "k8s_", so no stripping occurs
+        assert mw._base_tool_name("get_pods") == "get_pods"
+
+    def test_should_process_unprefixed(self):
+        configs = {
+            "k8s": ServerConfig(url="http://k8s/mcp", tools=["get_pods"]),
+        }
+        tool_map = {"get_pods": "k8s"}
+        mw = CondenserMiddleware(server_configs=configs, tool_server_map=tool_map)
+        cfg = mw._resolve_server_config("get_pods")
+        assert mw._should_process("get_pods", cfg) is True
+
+    def test_condense_item_unprefixed(self):
+        configs = {
+            "k8s": ServerConfig(url="http://k8s/mcp"),
+        }
+        tool_map = {"get_pods": "k8s"}
+        mw = CondenserMiddleware(server_configs=configs, tool_server_map=tool_map)
+        cfg = mw._resolve_server_config("get_pods")
+        text = json.dumps({"name": "test", "value": 42})
+        result = mw._condense_item(text, "get_pods", cfg)
+        assert result is not None
+        condensed, mode = result
+        assert mode == "condense"
+
+
+class TestToolCollisionDetection:
+    """Test that collision detection works when prefix_tools is disabled."""
+
+    def test_collision_raises_error(self):
+        """Simulate what _run_multi_upstream does: detect duplicate tool names."""
+        tool_server_map: dict[str, str] = {}
+        prefix_tools = False
+
+        # Simulate registering tools from two servers with overlapping names
+        server_tools = {
+            "k8s": ["get_pods", "get_nodes"],
+            "other_k8s": ["get_pods", "list_namespaces"],
+        }
+
+        with pytest.raises(ValueError, match="Tool name collision.*get_pods"):
+            for server_name, tools in server_tools.items():
+                for tool_name in tools:
+                    if prefix_tools:
+                        registered_name = f"{server_name}_{tool_name}"
+                    else:
+                        registered_name = tool_name
+                        if registered_name in tool_server_map:
+                            existing_server = tool_server_map[registered_name]
+                            raise ValueError(
+                                f"Tool name collision: '{registered_name}' is provided by "
+                                f"both '{existing_server}' and '{server_name}'. "
+                                f"Enable prefix_tools or use the 'tools' allowlist to resolve."
+                            )
+                    tool_server_map[registered_name] = server_name
+
+    def test_no_collision_with_distinct_tools(self):
+        """No error when servers have distinct tool names."""
+        tool_server_map: dict[str, str] = {}
+        prefix_tools = False
+
+        server_tools = {
+            "k8s": ["get_pods", "get_nodes"],
+            "github": ["list_repos", "create_issue"],
+        }
+
+        for server_name, tools in server_tools.items():
+            for tool_name in tools:
+                if prefix_tools:
+                    registered_name = f"{server_name}_{tool_name}"
+                else:
+                    registered_name = tool_name
+                    if registered_name in tool_server_map:
+                        existing_server = tool_server_map[registered_name]
+                        raise ValueError(
+                            f"Tool name collision: '{registered_name}' is provided by "
+                            f"both '{existing_server}' and '{server_name}'."
+                        )
+                tool_server_map[registered_name] = server_name
+
+        assert tool_server_map == {
+            "get_pods": "k8s",
+            "get_nodes": "k8s",
+            "list_repos": "github",
+            "create_issue": "github",
+        }
+
+    def test_no_collision_with_prefix_enabled(self):
+        """With prefix_tools=True, same tool names don't collide."""
+        tool_server_map: dict[str, str] = {}
+        prefix_tools = True
+
+        server_tools = {
+            "k8s": ["get_pods"],
+            "other_k8s": ["get_pods"],
+        }
+
+        for server_name, tools in server_tools.items():
+            for tool_name in tools:
+                if prefix_tools:
+                    registered_name = f"{server_name}_{tool_name}"
+                else:
+                    registered_name = tool_name
+                    if registered_name in tool_server_map:
+                        existing_server = tool_server_map[registered_name]
+                        raise ValueError(
+                            f"Tool name collision: '{registered_name}' is provided by "
+                            f"both '{existing_server}' and '{server_name}'."
+                        )
+                tool_server_map[registered_name] = server_name
+
+        assert tool_server_map == {
+            "k8s_get_pods": "k8s",
+            "other_k8s_get_pods": "other_k8s",
+        }
