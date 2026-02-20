@@ -83,7 +83,10 @@ Example `config.json`:
     "github": {
       "url": "http://localhost:8081/mcp",
       "tools": "*",
-      "condense": false
+      "condense": false,
+      "headers": {
+        "Authorization": "Bearer ghp_xxxxxxxxxxxx"
+      }
     }
   },
   "global": {
@@ -115,6 +118,8 @@ expose the same tool name with prefixing disabled, startup will fail with an err
 |---|---|---|
 | `url` | *(required)* | URL of the upstream MCP server |
 | `tools` | `"*"` | `"*"` for all tools, or a list of tool names to expose |
+| `headers` | `{}` | Static headers to send to this upstream (e.g. `{"Authorization": "Bearer ..."}`) |
+| `forward_headers` | `{}` | Map of incoming→outgoing header names to selectively forward from client requests |
 | `condense` | `true` | Whether to apply condensing to this server's tools |
 | `toon_only_tools` | `[]` | Tool names for direct TOON encoding (no preprocessing) |
 | `toon_fallback` | `true` | TOON-encode unmatched JSON results |
@@ -123,11 +128,54 @@ expose the same tool name with prefixing disabled, startup will fail with an err
 | `max_token_limit` | `0` | Token cap for responses (0 = off) |
 | `tool_token_limits` | `{}` | Per-tool token limits (`{"tool_name": limit}`) |
 
+#### Per-upstream authentication and header forwarding
+
+By default, all incoming HTTP headers from the client are forwarded to every
+upstream server. There are three ways to control this per upstream:
+
+**Static headers** — set fixed headers per upstream regardless of what the client
+sends. Useful for hardcoded API keys or bearer tokens:
+
+```json
+"github": {
+  "url": "http://localhost:8081/mcp",
+  "headers": {"Authorization": "Bearer ghp_xxxxxxxxxxxx"}
+}
+```
+
+**Header forwarding with translation** — selectively forward specific incoming
+headers with optional renaming. When `forward_headers` is set, *only* the mapped
+headers are forwarded (replacing the default forward-everything behavior):
+
+```json
+"k8s": {
+  "url": "http://localhost:8080/mcp",
+  "forward_headers": {"X-K8s-Token": "Authorization"}
+}
+```
+
+The client sends `X-K8s-Token: Bearer abc` → the k8s upstream receives
+`Authorization: Bearer abc`. To forward a header as-is to only one upstream,
+map it to itself: `{"Authorization": "Authorization"}`.
+
+**Both combined** — `forward_headers` maps incoming headers first, then `headers`
+overrides on top. This lets you translate some headers from the client while also
+injecting fixed values:
+
+```json
+"internal": {
+  "url": "http://localhost:8082/mcp",
+  "forward_headers": {"X-Request-Id": "X-Request-Id"},
+  "headers": {"Authorization": "Bearer fixed-token"}
+}
+```
+
 ### Environment variables (single-upstream mode)
 
 | Variable | Default | Description |
 |---|---|---|
 | `UPSTREAM_MCP_URL` | *(required)* | URL of the upstream MCP server |
+| `UPSTREAM_MCP_HEADERS` | *(empty)* | JSON object of headers to send upstream (e.g. `'{"Authorization":"Bearer ..."}' `) |
 | `CONDENSE_TOOLS` | `*` | Comma-separated tool names to condense, or `*` for all |
 | `TOON_ONLY_TOOLS` | *(empty)* | Comma-separated tool names for direct TOON encoding |
 | `TOON_FALLBACK` | `true` | TOON-encode unmatched JSON results |

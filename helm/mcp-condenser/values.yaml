@@ -12,6 +12,7 @@ fullnameOverride: ""
 config:
   # Single-upstream mode (set upstreamMcpUrl)
   upstreamMcpUrl: ""  # required unless condenserConfig is set
+  upstreamMcpHeaders: ""  # JSON object of headers to send upstream (e.g. '{"Authorization":"Bearer ..."}')
   condenseTools: "*"  # comma-separated tool names, or * for all
   toonOnlyTools: ""   # comma-separated tool names for direct TOON encoding (no preprocessing)
   toonFallback: "true"  # convert unmatched JSON results to TOON by default

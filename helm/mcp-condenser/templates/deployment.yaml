@@ -46,6 +46,10 @@ spec:
             - name: UPSTREAM_MCP_URL
               value: {{ required "config.upstreamMcpUrl is required (or set config.condenserConfig)" .Values.config.upstreamMcpUrl | quote }}
             {{- end }}
+            {{- if .Values.config.upstreamMcpHeaders }}
+            - name: UPSTREAM_MCP_HEADERS
+              value: {{ .Values.config.upstreamMcpHeaders | quote }}
+            {{- end }}
             - name: CONDENSE_TOOLS
               value: {{ .Values.config.condenseTools | quote }}
             - name: TOON_ONLY_TOOLS

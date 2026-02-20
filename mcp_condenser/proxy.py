@@ -40,18 +40,111 @@ Usage:
     CONDENSER_CONFIG=config.json python mcp_proxy.py
 """
 
+import contextlib
+import datetime
 import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import cast
 
+import httpx
 from fastmcp import FastMCP
+from fastmcp.client.transports import StreamableHttpTransport
+from fastmcp.server.dependencies import get_http_headers
 from fastmcp.server.middleware import Middleware
 from fastmcp.tools.tool import ToolResult
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+from mcp.shared._httpx_utils import create_mcp_http_client
 from mcp.types import TextContent
+from typing_extensions import Unpack
 
 from mcp_condenser.condenser import condense_json, toon_encode_json, stats, count_tokens, parse_input, truncate_to_token_limit
 from mcp_condenser.config import ProxyConfig, ServerConfig
 from mcp_condenser.metrics import MetricsRecorder, NoopRecorder, create_recorder, timer
+
+
+class _ForwardingTransport(StreamableHttpTransport):
+    """Transport that selectively forwards and renames incoming request headers.
+
+    When forward_headers is configured, only the mapped headers are forwarded
+    from the incoming request (instead of the default forward-everything behavior).
+    Static headers from config are always applied on top.
+    """
+
+    def __init__(
+        self,
+        url: str,
+        headers: dict[str, str] | None = None,
+        forward_headers: dict[str, str] | None = None,
+    ):
+        super().__init__(url, headers=headers)
+        self._forward_map = forward_headers or {}
+
+    @contextlib.asynccontextmanager
+    async def connect_session(
+        self, **session_kwargs: Unpack["StreamableHttpTransport.SessionKwargs"],  # type: ignore[override]
+    ) -> AsyncIterator[ClientSession]:
+        # Translate incoming headers per the mapping instead of forwarding all
+        incoming = get_http_headers()
+        translated = {}
+        for src, dst in self._forward_map.items():
+            val = incoming.get(src.lower())
+            if val is not None:
+                translated[dst.lower()] = val
+        # Static headers override translated headers
+        headers = translated | self.headers
+
+        timeout: httpx.Timeout | None = None
+        if session_kwargs.get("read_timeout_seconds") is not None:
+            read_timeout_seconds = cast(
+                datetime.timedelta, session_kwargs.get("read_timeout_seconds")
+            )
+            timeout = httpx.Timeout(30.0, read=read_timeout_seconds.total_seconds())
+
+        if self.httpx_client_factory is not None:
+            http_client = self.httpx_client_factory(
+                headers=headers,
+                auth=self.auth,
+                follow_redirects=True,
+                **({"timeout": timeout} if timeout else {}),
+            )
+        else:
+            http_client = create_mcp_http_client(
+                headers=headers,
+                timeout=timeout,
+                auth=self.auth,
+            )
+
+        async with (
+            http_client,
+            streamable_http_client(self.url, http_client=http_client) as transport,
+        ):
+            read_stream, write_stream, get_session_id = transport
+            self._get_session_id_cb = get_session_id
+            async with ClientSession(
+                read_stream, write_stream, **session_kwargs
+            ) as session:
+                yield session
+
+
+def _make_client(srv_cfg: ServerConfig):
+    """Create a FastMCP Client with per-upstream headers when configured."""
+    from fastmcp.client.client import Client
+
+    if srv_cfg.forward_headers:
+        transport = _ForwardingTransport(
+            url=srv_cfg.url,
+            headers=srv_cfg.headers or None,
+            forward_headers=srv_cfg.forward_headers,
+        )
+        return Client(transport)
+    if srv_cfg.headers:
+        from fastmcp.client.transports import StreamableHttpTransport
+
+        transport = StreamableHttpTransport(url=srv_cfg.url, headers=srv_cfg.headers)
+        return Client(transport)
+    return Client(srv_cfg.url)
 
 
 class CondenserMiddleware(Middleware):
@@ -262,7 +355,7 @@ def _run_single_upstream(config: ProxyConfig, metrics: MetricsRecorder):
     """Single-upstream mode: same as legacy behavior."""
     srv_cfg = config.servers["default"]
 
-    proxy = FastMCP.as_proxy(srv_cfg.url)
+    proxy = FastMCP.as_proxy(_make_client(srv_cfg))
     proxy.add_middleware(CondenserMiddleware(
         server_configs=config.servers,
         metrics=metrics,
@@ -289,7 +382,6 @@ def _run_single_upstream(config: ProxyConfig, metrics: MetricsRecorder):
 
 def _run_multi_upstream(config: ProxyConfig, metrics: MetricsRecorder):
     """Multi-upstream mode: aggregate tools from multiple upstreams."""
-    from fastmcp.client.client import Client
     from fastmcp.server.proxy import ProxyTool
 
     tool_server_map: dict[str, str] = {}
@@ -298,7 +390,7 @@ def _run_multi_upstream(config: ProxyConfig, metrics: MetricsRecorder):
     @asynccontextmanager
     async def lifespan(server: FastMCP) -> AsyncIterator[None]:
         for server_name, srv_cfg in config.servers.items():
-            client = Client(srv_cfg.url)
+            client = _make_client(srv_cfg)
             async with client:
                 mcp_tools = await client.list_tools()
 
@@ -321,7 +413,7 @@ def _run_multi_upstream(config: ProxyConfig, metrics: MetricsRecorder):
                         )
 
                 # Create a new Client for each ProxyTool (they manage their own sessions)
-                tool_client = Client(srv_cfg.url)
+                tool_client = _make_client(srv_cfg)
                 proxy_tool = ProxyTool.from_mcp_tool(tool_client, mcp_tool)
                 # ProxyTool is a pydantic model — create a copy with the registered name
                 proxy_tool = proxy_tool.model_copy(update={"name": registered_name})

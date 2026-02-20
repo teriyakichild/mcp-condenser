@@ -17,6 +17,8 @@ class ServerConfig:
 
     url: str
     tools: list[str] | None = None  # None means all ("*")
+    headers: dict[str, str] = field(default_factory=dict)
+    forward_headers: dict[str, str] = field(default_factory=dict)
     condense: bool = True
     toon_only_tools: list[str] = field(default_factory=list)
     toon_fallback: bool = True
@@ -81,9 +83,15 @@ class ProxyConfig:
         metrics_enabled = metrics_enabled_env not in ("false", "0", "no", "")
         metrics_port = int(os.environ.get("METRICS_PORT", "9090"))
 
+        headers_env = os.environ.get("UPSTREAM_MCP_HEADERS", "").strip()
+        headers: dict[str, str] = {}
+        if headers_env:
+            headers = json.loads(headers_env)
+
         server = ServerConfig(
             url=url,
             tools=tools,
+            headers=headers,
             condense=True,
             toon_only_tools=toon_only,
             toon_fallback=toon_fallback,
@@ -128,6 +136,8 @@ class ProxyConfig:
             servers[name] = ServerConfig(
                 url=srv["url"],
                 tools=tools,
+                headers=srv.get("headers", {}),
+                forward_headers=srv.get("forward_headers", {}),
                 condense=srv.get("condense", True),
                 toon_only_tools=toon_only,
                 toon_fallback=srv.get("toon_fallback", True),
