@@ -177,6 +177,48 @@ class TestMetricsConfig:
         assert config.metrics_port == 7777
 
 
+class TestHeuristicsConfig:
+    def test_from_env_parses_heuristics(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        monkeypatch.setenv("CONDENSER_HEURISTICS", "elide_timestamps:false,group_tuples:false")
+        config = ProxyConfig.from_env()
+        srv = config.servers["default"]
+        assert srv.heuristics == {"elide_timestamps": False, "group_tuples": False}
+
+    def test_from_env_true_values(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        monkeypatch.setenv("CONDENSER_HEURISTICS", "elide_all_zero:true,elide_constants:yes")
+        config = ProxyConfig.from_env()
+        srv = config.servers["default"]
+        assert srv.heuristics == {"elide_all_zero": True, "elide_constants": True}
+
+    def test_from_env_empty_default(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        config = ProxyConfig.from_env()
+        assert config.servers["default"].heuristics == {}
+
+    def test_from_file_parses_heuristics(self, tmp_path):
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "servers": {
+                "k8s": {
+                    "url": "http://localhost/mcp",
+                    "heuristics": {"elide_timestamps": False}
+                }
+            }
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        assert config.servers["k8s"].heuristics == {"elide_timestamps": False}
+
+    def test_from_file_empty_default(self, tmp_path):
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "servers": {"s": {"url": "http://localhost/mcp"}}
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        assert config.servers["s"].heuristics == {}
+
+
 class TestLoad:
     def test_prefers_config_file(self, tmp_path, monkeypatch):
         cfg_file = tmp_path / "config.json"

@@ -239,7 +239,17 @@ class CondenserMiddleware(Middleware):
         base_name = self._base_tool_name(tool_name)
 
         # Build heuristics from config
-        h = Heuristics(**cfg.heuristics) if cfg.heuristics else None
+        if cfg.heuristics:
+            try:
+                h = Heuristics(**cfg.heuristics)
+            except TypeError as exc:
+                valid_keys = ", ".join(f.name for f in Heuristics.__dataclass_fields__.values())
+                raise TypeError(
+                    f"Invalid heuristics configuration {cfg.heuristics!r}: {exc}. "
+                    f"Valid heuristic names are: {valid_keys}"
+                ) from exc
+        else:
+            h = None
 
         # 1. TOON_ONLY → direct TOON encoding
         if base_name in cfg.toon_only_tools:

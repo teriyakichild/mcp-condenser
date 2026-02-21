@@ -1,6 +1,12 @@
 """Tests for individually toggling condensing heuristics."""
 
+import json
+
+import pytest
+
 from mcp_condenser.condenser import Heuristics, condense_json, preprocess_table
+from mcp_condenser.config import ServerConfig
+from mcp_condenser.proxy import CondenserMiddleware
 
 
 # Shared fixture: rows with all-zero, all-null, constant, timestamp, and tuple-groupable columns
@@ -171,3 +177,15 @@ class TestCondenseJsonWithHeuristics:
         # All column values should be present
         assert "zero_col" in result
         assert "const_col" in result
+
+
+class TestInvalidHeuristicKey:
+    def test_typo_raises_helpful_error(self):
+        cfg = ServerConfig(
+            url="http://localhost/mcp",
+            heuristics={"elide_timestaps": False},  # typo
+        )
+        mw = CondenserMiddleware(server_configs={"default": cfg})
+        data = json.dumps([{"a": 1, "b": 2}, {"a": 3, "b": 4}])
+        with pytest.raises(TypeError, match="Valid heuristic names are"):
+            mw._condense_item(data, "some_tool", cfg)
