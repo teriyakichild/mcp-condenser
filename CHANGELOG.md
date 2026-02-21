@@ -1,6 +1,31 @@
 # CHANGELOG
 
 
+## v0.5.1 (2026-02-21)
+
+### Bug Fixes
+
+- Improve TOON accuracy with cardinality-aware identity columns and tuple size cap
+  ([`7becc62`](https://github.com/teriyakichild/mcp-condenser/commit/7becc624beb366f938c5b06e03a0f47c6f424a1f))
+
+- find_identity_column now picks the highest-cardinality column when multiple match the same keyword
+  (e.g. podRef.name over network.name) - Add max_tuple_size heuristic (default 4) to prevent large
+  positional tuple groups that small LLMs misparse - Support int-valued heuristics in env config
+  parser - Add --num-ctx flag to accuracy benchmark for Ollama context control - Add failure logging
+  and detail printing to accuracy benchmark
+
+### Documentation
+
+- Add comprehensive configuration reference
+  ([`b6fe86b`](https://github.com/teriyakichild/mcp-condenser/commit/b6fe86b8fc7ee06648f472e16650f2996358c56c))
+
+Move inline config tables from README to docs/CONFIGURATION.md covering all env vars, config file
+  schema, condensing heuristics, and Helm values.
+
+- Use latest tag instead of hardcoded version in README
+  ([`280ec8d`](https://github.com/teriyakichild/mcp-condenser/commit/280ec8dc80fb8baaf1316d2521ce1ee6c51336bb))
+
+
 ## v0.5.0 (2026-02-21)
 
 ### Bug Fixes
