@@ -1,0 +1,46 @@
+# Multi-upstream mode
+#
+# Usage:
+#   helm install mcp-condenser ./helm/mcp-condenser -f examples/helm/values-multi.yaml
+
+image:
+  repository: teriyakichild/mcp-condenser
+  tag: "0.4.2"
+
+config:
+  condenserConfig: |
+    {
+      "servers": {
+        "k8s": {
+          "url": "http://k8s-mcp:8080/mcp",
+          "tools": "*",
+          "condense": true,
+          "max_token_limit": 4000,
+          "tool_token_limits": {"get_pods": 3000}
+        },
+        "github": {
+          "url": "http://github-mcp:8081/mcp",
+          "tools": "*",
+          "condense": false,
+          "headers": {"Authorization": "Bearer ghp_xxxxxxxxxxxx"}
+        }
+      },
+      "global": {
+        "prefix_tools": true
+      }
+    }
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: prometheus
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

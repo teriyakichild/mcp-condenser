@@ -1,0 +1,22 @@
+# Quick-start: MCP Condenser proxy with Docker Compose
+#
+# Single-upstream mode — point at one MCP server and condense all tool responses.
+#
+# Usage:
+#   docker compose up
+#
+# Then configure your MCP client to connect to:
+#   http://localhost:9000/mcp
+
+services:
+  mcp-condenser:
+    image: teriyakichild/mcp-condenser:0.4.2
+    ports:
+      - "9000:9000"
+    environment:
+      UPSTREAM_MCP_URL: "http://host.docker.internal:8080/mcp"
+      CONDENSE_TOOLS: "*"
+      # UPSTREAM_MCP_HEADERS: '{"Authorization":"Bearer your-token"}'
+      # MIN_TOKEN_THRESHOLD: "200"
+      # MAX_TOKEN_LIMIT: "4000"
+      # TOOL_TOKEN_LIMITS: "get_pods:3000,get_nodes:2000"
