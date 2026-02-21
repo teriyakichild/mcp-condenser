@@ -26,7 +26,7 @@ class ServerConfig:
     revert_if_larger: bool = False
     max_token_limit: int = 0
     tool_token_limits: dict[str, int] = field(default_factory=dict)
-    heuristics: dict[str, bool | int] = field(default_factory=dict)
+    heuristics: dict[str, bool | int | float] = field(default_factory=dict)
 
 
 @dataclass
@@ -78,7 +78,7 @@ class ProxyConfig:
                     tool_token_limits[name.strip()] = int(limit.strip())
 
         heuristics_env = os.environ.get("CONDENSER_HEURISTICS", "").strip()
-        heuristics: dict[str, bool | int] = {}
+        heuristics: dict[str, bool | int | float] = {}
         if heuristics_env:
             for pair in heuristics_env.split(","):
                 pair = pair.strip()
@@ -88,7 +88,10 @@ class ProxyConfig:
                     try:
                         heuristics[name.strip()] = int(val)
                     except ValueError:
-                        heuristics[name.strip()] = val.lower() not in ("false", "0", "no")
+                        try:
+                            heuristics[name.strip()] = float(val)
+                        except ValueError:
+                            heuristics[name.strip()] = val.lower() not in ("false", "0", "no")
 
         host = os.environ.get("PROXY_HOST", "0.0.0.0")
         port = int(os.environ.get("PROXY_PORT", "9000"))

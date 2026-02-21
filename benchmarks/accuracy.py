@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-from mcp_condenser.condenser import condense_json, count_tokens
+from mcp_condenser.condenser import Heuristics, condense_json, count_tokens
 
 
 # ---------------------------------------------------------------------------
@@ -238,9 +238,10 @@ def run_benchmark(args) -> list[dict]:
     fixtures_dir = Path(args.fixtures_dir)
     results = []
 
+    h = getattr(args, 'heuristics_obj', None)
     for fixture, questions in QUESTIONS.items():
         raw, data = load_sample(fixtures_dir, fixture)
-        condensed = condense_json(data)
+        condensed = condense_json(data, heuristics=h)
 
         for question, expected, match_fn in questions:
             # JSON baseline (unless --toon-only)
@@ -307,12 +308,15 @@ def run_benchmark(args) -> list[dict]:
 # Output formatters
 # ---------------------------------------------------------------------------
 
-def print_summary(results: list[dict], fixtures_dir: Path):
+def print_summary(results: list[dict], fixtures_dir: Path, heuristics: Heuristics | None = None, heuristic_overrides: dict | None = None):
     """Print formatted summary table to stdout."""
     print()
     print("=" * 80)
     print("  Accuracy Benchmark")
     print("=" * 80)
+
+    if heuristic_overrides:
+        print(f"  Heuristics: {heuristic_overrides}")
 
     # Per-fixture token comparison
     print()
@@ -320,7 +324,7 @@ def print_summary(results: list[dict], fixtures_dir: Path):
     print(f"  {'-'*28} {'-'*12} {'-'*12} {'-'*10}")
     for fixture in QUESTIONS:
         raw, data = load_sample(fixtures_dir, fixture)
-        condensed = condense_json(data)
+        condensed = condense_json(data, heuristics=heuristics)
         rt = count_tokens(raw)
         ct = count_tokens(condensed)
         pct = (1 - ct / rt) * 100
@@ -453,8 +457,32 @@ def main():
         default="benchmarks/failures.jsonl",
         help="Path to JSONL failure log (default: benchmarks/failures.jsonl)",
     )
+    parser.add_argument(
+        "--heuristics",
+        default="",
+        help="Heuristic overrides as key:val,key:val (e.g. max_table_columns:12,elide_mostly_zero_pct:0.8)",
+    )
 
     args = parser.parse_args()
+
+    # Parse heuristic overrides
+    heuristic_overrides: dict[str, bool | int | float] = {}
+    if args.heuristics:
+        for pair in args.heuristics.split(","):
+            pair = pair.strip()
+            if ":" in pair:
+                name, val = pair.rsplit(":", 1)
+                val = val.strip()
+                try:
+                    heuristic_overrides[name.strip()] = int(val)
+                except ValueError:
+                    try:
+                        heuristic_overrides[name.strip()] = float(val)
+                    except ValueError:
+                        heuristic_overrides[name.strip()] = val.lower() not in ("false", "0", "no")
+    args.heuristics_obj = Heuristics(**heuristic_overrides) if heuristic_overrides else None
+    args.heuristic_overrides = heuristic_overrides
+
     results = run_benchmark(args)
 
     log_failures(results, args.model, Path(args.failures_log))
@@ -462,7 +490,7 @@ def main():
     if args.json_output:
         print_json(results)
     else:
-        print_summary(results, Path(args.fixtures_dir))
+        print_summary(results, Path(args.fixtures_dir), heuristics=args.heuristics_obj, heuristic_overrides=args.heuristic_overrides)
 
     # Exit 1 if any TOON answers failed
     toon_results = [r for r in results if r["format"] == "toon" and r["passed"] is not None]

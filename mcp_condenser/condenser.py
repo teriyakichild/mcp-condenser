@@ -33,6 +33,8 @@ class Heuristics:
     elide_constants: bool = True
     group_tuples: bool = True
     max_tuple_size: int = 4
+    max_table_columns: int = 0       # 0 = no limit
+    elide_mostly_zero_pct: float = 0.0  # 0.0 = disabled
 
 try:
     import tiktoken
@@ -296,6 +298,30 @@ def preprocess_table(name: str, arr: list, heuristics: Heuristics | None = None)
             annotations.append(f"  elided all_null: {', '.join(nc)}")
             elided.update(nc)
 
+    # 2.5) Elide mostly-zero columns (threshold-based)
+    if heuristics.elide_mostly_zero_pct > 0:
+        id_col = find_identity_column(cols, arr)
+        for c in cols:
+            if c in elided or info[c]["is_all_zero"] or info[c]["is_all_null"]:
+                continue
+            fmted = info[c]["fmted"]
+            n_total = len(fmted)
+            if n_total == 0:
+                continue
+            n_zero = sum(1 for v in fmted if v in ("0", ""))
+            if n_zero / n_total >= heuristics.elide_mostly_zero_pct:
+                # Build outlier annotation with identity labels
+                non_zero = []
+                for i, v in enumerate(fmted):
+                    if v not in ("0", ""):
+                        label = fmt(flatten(arr[i]).get(id_col)) if id_col else str(i)
+                        non_zero.append(f"{label}={v}")
+                if non_zero:
+                    annotations.append(f"  elided mostly_zero: {c} (non-zero: {', '.join(non_zero)})")
+                else:
+                    annotations.append(f"  elided mostly_zero: {c}")
+                elided.add(c)
+
     # 3) Elide clustered timestamps
     if heuristics.elide_timestamps:
         for c in cols:
@@ -349,6 +375,16 @@ def preprocess_table(name: str, arr: list, heuristics: Heuristics | None = None)
         else:
             final.append((c, [c]))
             seen.add(c)
+
+    # 6.5) Cap table width if max_table_columns is set
+    if heuristics.max_table_columns > 0 and len(final) > heuristics.max_table_columns:
+        # Identity columns (name, id, namespace, uid) are ordered first by order_columns,
+        # so they survive the cap naturally. Just truncate from the right.
+        kept = final[:heuristics.max_table_columns]
+        overflow = final[heuristics.max_table_columns:]
+        overflow_names = [h for h, _ in overflow]
+        annotations.append(f"  elided overflow ({len(overflow_names)} columns exceed limit): {', '.join(overflow_names)}")
+        final = kept
 
     # 7) Build cleaned rows as dicts for TOON encoding
     cleaned_rows = []

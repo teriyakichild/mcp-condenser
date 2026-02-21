@@ -54,6 +54,8 @@ class TestHeuristicsDataclass:
         assert h.elide_constants is True
         assert h.group_tuples is True
         assert h.max_tuple_size == 4
+        assert h.max_table_columns == 0
+        assert h.elide_mostly_zero_pct == 0.0
 
     def test_override_single(self):
         h = Heuristics(elide_timestamps=False)
@@ -230,7 +232,109 @@ class TestMaxTupleSizeToggle:
         assert any("memory(" in h for h in headers)
 
 
-class TestInvalidHeuristicKey:
+class TestMaxTableColumns:
+    def _make_wide_rows(self):
+        """Build a 24-column table mimicking pods data."""
+        cols = [f"col{i}" for i in range(22)]
+        rows = []
+        for name in ["pod-a", "pod-b", "pod-c"]:
+            row = {"podRef.name": name, "podRef.namespace": "default"}
+            for c in cols:
+                row[c] = name.count("a") + 1  # some non-zero value
+            rows.append(row)
+        return rows
+
+    def test_wide_table_capped(self):
+        """24-col table with max_table_columns=10 results in <=10 columns."""
+        rows = self._make_wide_rows()
+        h = Heuristics(max_table_columns=10, elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        _, cleaned, final = preprocess_table("t", rows, h)
+        assert len(final) <= 10
+        for row in cleaned:
+            assert len(row) <= 10
+
+    def test_identity_columns_survive_cap(self):
+        """podRef.name and podRef.namespace survive even at a tight cap."""
+        rows = self._make_wide_rows()
+        h = Heuristics(max_table_columns=4, elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        _, cleaned, final = preprocess_table("t", rows, h)
+        headers = [hdr for hdr, _ in final]
+        assert "podRef.name" in headers
+        assert "podRef.namespace" in headers
+
+    def test_overflow_annotated(self):
+        """Annotation lists dropped columns."""
+        rows = self._make_wide_rows()
+        h = Heuristics(max_table_columns=4, elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        annotations, _, _ = preprocess_table("t", rows, h)
+        overflow_annotations = [a for a in annotations if "overflow" in a]
+        assert len(overflow_annotations) == 1
+        assert "columns exceed limit" in overflow_annotations[0]
+
+    def test_zero_means_no_limit(self):
+        """max_table_columns=0 keeps all columns (default behavior)."""
+        rows = self._make_wide_rows()
+        h = Heuristics(max_table_columns=0, elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        _, _, final = preprocess_table("t", rows, h)
+        # Should have all 24 columns (2 identity + 22 data)
+        assert len(final) == 24
+
+
+class TestElideMostlyZero:
+    def _make_rows(self):
+        """5 rows where mostly_zero_col is zero for 4/5 (80%)."""
+        return [
+            {"name": "a", "data_col": 100, "mostly_zero_col": 0, "mixed_col": 10},
+            {"name": "b", "data_col": 200, "mostly_zero_col": 0, "mixed_col": 0},
+            {"name": "c", "data_col": 300, "mostly_zero_col": 0, "mixed_col": 20},
+            {"name": "d", "data_col": 400, "mostly_zero_col": 42, "mixed_col": 0},
+            {"name": "e", "data_col": 500, "mostly_zero_col": 0, "mixed_col": 30},
+        ]
+
+    def test_mostly_zero_elided(self):
+        """Column with 80% zeros is elided at threshold 0.8."""
+        rows = self._make_rows()
+        h = Heuristics(elide_mostly_zero_pct=0.8, elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        annotations, cleaned, _ = preprocess_table("t", rows, h)
+        assert any("mostly_zero" in a and "mostly_zero_col" in a for a in annotations)
+        for row in cleaned:
+            assert "mostly_zero_col" not in row
+
+    def test_outlier_values_in_annotation(self):
+        """Annotation includes non-zero values with row identity labels."""
+        rows = self._make_rows()
+        h = Heuristics(elide_mostly_zero_pct=0.8, elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        annotations, _, _ = preprocess_table("t", rows, h)
+        mz_ann = [a for a in annotations if "mostly_zero" in a and "mostly_zero_col" in a]
+        assert len(mz_ann) == 1
+        assert "d=42" in mz_ann[0]
+
+    def test_not_quite_mostly_zero_kept(self):
+        """Column with 60% zeros kept at threshold 0.8."""
+        rows = self._make_rows()
+        # mixed_col has 2/5 zeros (40%), should NOT be elided at 0.8 threshold
+        h = Heuristics(elide_mostly_zero_pct=0.8, elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        _, cleaned, _ = preprocess_table("t", rows, h)
+        assert any("mixed_col" in row for row in cleaned)
+
+    def test_disabled_by_default(self):
+        """elide_mostly_zero_pct=0.0 keeps all columns."""
+        rows = self._make_rows()
+        h = Heuristics(elide_mostly_zero_pct=0.0, elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        annotations, cleaned, _ = preprocess_table("t", rows, h)
+        assert not any("mostly_zero" in a for a in annotations)
+        assert any("mostly_zero_col" in row for row in cleaned)
+
+
+
     def test_typo_raises_helpful_error(self):
         cfg = ServerConfig(
             url="http://localhost/mcp",
