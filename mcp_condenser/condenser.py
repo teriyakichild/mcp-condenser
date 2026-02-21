@@ -16,11 +16,22 @@ Usage:
 
 import json, sys, re, argparse
 import yaml
+from dataclasses import dataclass
 from typing import Any
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timezone
 
 import toon_format
+
+
+@dataclass
+class Heuristics:
+    """Toggle individual preprocessing heuristics on/off."""
+    elide_all_zero: bool = True
+    elide_all_null: bool = True
+    elide_timestamps: bool = True
+    elide_constants: bool = True
+    group_tuples: bool = True
 
 try:
     import tiktoken
@@ -241,13 +252,16 @@ def extract_array_fields(arr: list, cols: list[str]) -> tuple[list[str], dict]:
     return remaining, array_cols
 
 
-def preprocess_table(name: str, arr: list) -> tuple[list[str], list[dict], list[tuple[str, list[str]]]]:
+def preprocess_table(name: str, arr: list, heuristics: Heuristics | None = None) -> tuple[list[str], list[dict], list[tuple[str, list[str]]]]:
     """Analyze and clean a homogeneous array.
 
     Returns:
         (annotations, cleaned_rows_as_list_of_ordered_values, final_columns)
         where final_columns is list of (header, [source_cols])
     """
+    if heuristics is None:
+        heuristics = Heuristics()
+
     cols = order_columns(union_columns(arr))
     info = analyze_columns(arr, cols)
 
@@ -255,38 +269,45 @@ def preprocess_table(name: str, arr: list) -> tuple[list[str], list[dict], list[
     elided = set()
 
     # 1) Elide all-zero
-    zc = [c for c in cols if info[c]["is_all_zero"] and not info[c]["is_all_null"]]
-    if zc:
-        annotations.append(f"  elided all_zero: {', '.join(zc)}")
-        elided.update(zc)
+    if heuristics.elide_all_zero:
+        zc = [c for c in cols if info[c]["is_all_zero"] and not info[c]["is_all_null"]]
+        if zc:
+            annotations.append(f"  elided all_zero: {', '.join(zc)}")
+            elided.update(zc)
 
     # 2) Elide all-null
-    nc = [c for c in cols if info[c]["is_all_null"] and c not in elided]
-    if nc:
-        annotations.append(f"  elided all_null: {', '.join(nc)}")
-        elided.update(nc)
+    if heuristics.elide_all_null:
+        nc = [c for c in cols if info[c]["is_all_null"] and c not in elided]
+        if nc:
+            annotations.append(f"  elided all_null: {', '.join(nc)}")
+            elided.update(nc)
 
     # 3) Elide clustered timestamps
-    for c in cols:
-        if c in elided:
-            continue
-        if info[c]["ts_clustered"] and info[c]["is_constant"]:
-            annotations.append(f"  elided constant {c}: {info[c]['const_val']}")
-            elided.add(c)
-        elif info[c]["ts_clustered"]:
-            center = info[c]["ts_center"] or info[c]["raw"][0]
-            annotations.append(f"  elided timestamp_cluster {c}: ~{center} (within 60s)")
-            elided.add(c)
+    if heuristics.elide_timestamps:
+        for c in cols:
+            if c in elided:
+                continue
+            if info[c]["ts_clustered"] and info[c]["is_constant"]:
+                annotations.append(f"  elided constant {c}: {info[c]['const_val']}")
+                elided.add(c)
+            elif info[c]["ts_clustered"]:
+                center = info[c]["ts_center"] or info[c]["raw"][0]
+                annotations.append(f"  elided timestamp_cluster {c}: ~{center} (within 60s)")
+                elided.add(c)
 
     # 4) Elide other constant columns
-    for c in cols:
-        if c not in elided and info[c]["is_constant"] and not info[c]["is_all_zero"] and not info[c]["is_all_null"]:
-            annotations.append(f"  elided constant {c}: {info[c]['const_val']}")
-            elided.add(c)
+    if heuristics.elide_constants:
+        for c in cols:
+            if c not in elided and info[c]["is_constant"] and not info[c]["is_all_zero"] and not info[c]["is_all_null"]:
+                annotations.append(f"  elided constant {c}: {info[c]['const_val']}")
+                elided.add(c)
 
     # 5) Detect numeric tuples from remaining columns
     remaining = [c for c in cols if c not in elided]
-    tuples = detect_numeric_tuples(remaining, info)
+    if heuristics.group_tuples:
+        tuples = detect_numeric_tuples(remaining, info)
+    else:
+        tuples = {}
 
     tuple_members = set()
     tuple_map = OrderedDict()
@@ -337,7 +358,7 @@ def preprocess_table(name: str, arr: list) -> tuple[list[str], list[dict], list[
     return annotations, cleaned_rows, final
 
 
-def render_table(name: str, arr: list) -> list[str]:
+def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> list[str]:
     """Render a homogeneous array as TOON table block(s).
 
     Returns list of text blocks (parent table + any extracted sub-tables).
@@ -387,7 +408,7 @@ def render_table(name: str, arr: list) -> list[str]:
 
     # Now preprocess the parent table (array fields are excluded by union_columns
     # since flatten keeps arrays as-is and union_columns skips them)
-    annotations, cleaned_rows, final_cols = preprocess_table(name, arr)
+    annotations, cleaned_rows, final_cols = preprocess_table(name, arr, heuristics)
 
     # Encode with TOON
     toon_text = toon_format.encode(cleaned_rows)
@@ -404,7 +425,7 @@ def render_table(name: str, arr: list) -> list[str]:
         sub_name = f"{name}.{af}"
         # Wrap sub_items back into dicts for render_table recursion
         # sub_items are already flat dicts, wrap in list
-        sub_annotations, sub_cleaned, sub_final = preprocess_table(sub_name, [dict(si) for si in sub_items])
+        sub_annotations, sub_cleaned, sub_final = preprocess_table(sub_name, [dict(si) for si in sub_items], heuristics)
         sub_toon = toon_format.encode(sub_cleaned)
 
         sub_header = f"--- {sub_name} ({len(sub_items)} rows) ---"
@@ -425,7 +446,7 @@ def render_scalars(name: str, flat: OrderedDict) -> str:
 
 # ── recursive condenser ─────────────────────────────────────────────────────
 
-def condense(name: str, obj: Any) -> list[str]:
+def condense(name: str, obj: Any, heuristics: Heuristics | None = None) -> list[str]:
     blocks = []
     t = classify(obj)
 
@@ -447,19 +468,19 @@ def condense(name: str, obj: Any) -> list[str]:
         for ak, av in arrays.items():
             an = f"{name}.{ak}" if name else ak
             if is_homogeneous_array(av):
-                blocks.extend(render_table(an, av))
+                blocks.extend(render_table(an, av, heuristics))
             elif av and isinstance(av[0], dict):
                 for i, item in enumerate(av):
-                    blocks.extend(condense(f"{an}[{i}]", item))
+                    blocks.extend(condense(f"{an}[{i}]", item, heuristics))
             else:
                 blocks.append(f"{an}: {json.dumps(av)}")
 
     elif t == "array":
         if is_homogeneous_array(obj):
-            blocks.extend(render_table(name, obj))
+            blocks.extend(render_table(name, obj, heuristics))
         elif obj and isinstance(obj[0], dict):
             for i, item in enumerate(obj):
-                blocks.extend(condense(f"{name}[{i}]", item))
+                blocks.extend(condense(f"{name}[{i}]", item, heuristics))
         else:
             blocks.append(f"{name}: {json.dumps(obj)}")
 
@@ -490,13 +511,13 @@ def _join_blocks(blocks: list[str]) -> str:
     return "\n\n".join(parts)
 
 
-def condense_json(data: Any) -> str:
+def condense_json(data: Any, heuristics: Heuristics | None = None) -> str:
     if isinstance(data, dict):
         blocks = []
         for k in data:
-            blocks.extend(condense(k, data[k]))
+            blocks.extend(condense(k, data[k], heuristics))
         return _join_blocks(blocks)
-    return _join_blocks(condense("root", data))
+    return _join_blocks(condense("root", data, heuristics))
 
 
 def toon_encode_json(data: Any) -> str:

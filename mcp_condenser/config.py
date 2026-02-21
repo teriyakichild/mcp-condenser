@@ -26,6 +26,7 @@ class ServerConfig:
     revert_if_larger: bool = False
     max_token_limit: int = 0
     tool_token_limits: dict[str, int] = field(default_factory=dict)
+    heuristics: dict[str, bool] = field(default_factory=dict)
 
 
 @dataclass
@@ -76,6 +77,15 @@ class ProxyConfig:
                     name, limit = pair.rsplit(":", 1)
                     tool_token_limits[name.strip()] = int(limit.strip())
 
+        heuristics_env = os.environ.get("CONDENSER_HEURISTICS", "").strip()
+        heuristics: dict[str, bool] = {}
+        if heuristics_env:
+            for pair in heuristics_env.split(","):
+                pair = pair.strip()
+                if ":" in pair:
+                    name, val = pair.rsplit(":", 1)
+                    heuristics[name.strip()] = val.strip().lower() not in ("false", "0", "no")
+
         host = os.environ.get("PROXY_HOST", "0.0.0.0")
         port = int(os.environ.get("PROXY_PORT", "9000"))
 
@@ -99,6 +109,7 @@ class ProxyConfig:
             revert_if_larger=revert_if_larger,
             max_token_limit=max_token_limit,
             tool_token_limits=tool_token_limits,
+            heuristics=heuristics,
         )
         return cls(
             servers={"default": server},
@@ -133,6 +144,7 @@ class ProxyConfig:
 
             toon_only = srv.get("toon_only_tools", [])
             tool_token_limits = {k: int(v) for k, v in srv.get("tool_token_limits", {}).items()}
+            srv_heuristics = srv.get("heuristics", {})
 
             servers[name] = ServerConfig(
                 url=srv["url"],
@@ -146,6 +158,7 @@ class ProxyConfig:
                 revert_if_larger=srv.get("revert_if_larger", False),
                 max_token_limit=srv.get("max_token_limit", 0),
                 tool_token_limits=tool_token_limits,
+                heuristics=srv_heuristics,
             )
 
         return cls(
