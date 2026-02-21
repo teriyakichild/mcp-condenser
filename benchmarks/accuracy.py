@@ -180,6 +180,32 @@ QUESTIONS: dict[str, list[tuple[str, str, callable]]] = {
             "pods",
             contains,
         ),
+        # --- multi-hop, arithmetic, ranking ---
+        (
+            "What is the memory rssBytes of the pod with the highest CPU usageNanoCores? Give the number only.",
+            "136196096",
+            contains,
+        ),
+        (
+            "How many pods are NOT in the kube-system namespace?",
+            "13",
+            contains_or_numeric,
+        ),
+        (
+            "What is the name of the pod with the third highest memory workingSetBytes? Give the pod name only.",
+            "cilium",
+            contains,
+        ),
+        (
+            "What percentage of node filesystem capacity is used? Round to one decimal place.",
+            "27.5",
+            contains_or_numeric,
+        ),
+        (
+            "Which pod has the lowest CPU usageNanoCores? Give the pod name only.",
+            "kube-proxy",
+            contains,
+        ),
     ],
     "toolresult2_small.json": [
         # --- direct lookups ---
@@ -273,6 +299,42 @@ QUESTIONS: dict[str, list[tuple[str, str, callable]]] = {
             "What is the opensearch container's rootfs used bytes?",
             "2640306176",
             contains,
+        ),
+        # --- multi-hop, arithmetic, cross-section, ranking ---
+        (
+            "What is the memory rssBytes of the pod with the highest CPU usageNanoCores? Give the number only.",
+            "376483840",
+            contains,
+        ),
+        (
+            "How many containers does the pod with the highest memory workingSetBytes have?",
+            "1",
+            contains_or_numeric,
+        ),
+        (
+            "How many pods are NOT in the kube-system namespace?",
+            "4",
+            contains_or_numeric,
+        ),
+        (
+            "What is the name of the pod with the third highest memory workingSetBytes? Give the pod name only.",
+            "basic-memory",
+            contains,
+        ),
+        (
+            "What percentage of node filesystem capacity is used? Round to one decimal place.",
+            "44.7",
+            contains_or_numeric,
+        ),
+        (
+            "What is the constant ephemeral-storage availableBytes value shared by all pods?",
+            "22442622976",
+            contains,
+        ),
+        (
+            "How many total containers are there across all pods combined?",
+            "9",
+            contains_or_numeric,
         ),
     ],
 }
