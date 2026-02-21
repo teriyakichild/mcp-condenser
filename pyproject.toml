@@ -38,6 +38,7 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+addopts = "--strict-markers"
 
 [dependency-groups]
 dev = ["pytest>=8.0"]
