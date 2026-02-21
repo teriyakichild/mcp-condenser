@@ -219,6 +219,57 @@ class TestHeuristicsConfig:
         assert config.servers["s"].heuristics == {}
 
 
+class TestToolHeuristicsConfig:
+    def test_from_file_parses_tool_heuristics(self, tmp_path):
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "servers": {
+                "k8s": {
+                    "url": "http://localhost/mcp",
+                    "heuristics": {"elide_timestamps": False},
+                    "tool_heuristics": {
+                        "get_node_metrics": {"elide_constants": False}
+                    }
+                }
+            }
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        srv = config.servers["k8s"]
+        assert srv.heuristics == {"elide_timestamps": False}
+        assert srv.tool_heuristics == {"get_node_metrics": {"elide_constants": False}}
+
+    def test_from_file_empty_default(self, tmp_path):
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "servers": {"s": {"url": "http://localhost/mcp"}}
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        assert config.servers["s"].tool_heuristics == {}
+
+    def test_from_env_no_tool_heuristics(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        config = ProxyConfig.from_env()
+        assert config.servers["default"].tool_heuristics == {}
+
+
+class TestStringHeuristicsEnvParsing:
+    def test_string_value_preserved(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        monkeypatch.setenv("CONDENSER_HEURISTICS", "some_setting:custom_val,max_table_columns:12")
+        config = ProxyConfig.from_env()
+        srv = config.servers["default"]
+        assert srv.heuristics["some_setting"] == "custom_val"
+        assert srv.heuristics["max_table_columns"] == 12
+
+    def test_bool_keywords_still_parsed(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        monkeypatch.setenv("CONDENSER_HEURISTICS", "elide_timestamps:false,elide_all_zero:true")
+        config = ProxyConfig.from_env()
+        srv = config.servers["default"]
+        assert srv.heuristics["elide_timestamps"] is False
+        assert srv.heuristics["elide_all_zero"] is True
+
+
 class TestLoad:
     def test_prefers_config_file(self, tmp_path, monkeypatch):
         cfg_file = tmp_path / "config.json"

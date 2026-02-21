@@ -26,7 +26,8 @@ class ServerConfig:
     revert_if_larger: bool = False
     max_token_limit: int = 0
     tool_token_limits: dict[str, int] = field(default_factory=dict)
-    heuristics: dict[str, bool | int | float] = field(default_factory=dict)
+    heuristics: dict[str, bool | int | float | str] = field(default_factory=dict)
+    tool_heuristics: dict[str, dict[str, bool | int | float | str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -78,7 +79,7 @@ class ProxyConfig:
                     tool_token_limits[name.strip()] = int(limit.strip())
 
         heuristics_env = os.environ.get("CONDENSER_HEURISTICS", "").strip()
-        heuristics: dict[str, bool | int | float] = {}
+        heuristics: dict[str, bool | int | float | str] = {}
         if heuristics_env:
             for pair in heuristics_env.split(","):
                 pair = pair.strip()
@@ -91,7 +92,10 @@ class ProxyConfig:
                         try:
                             heuristics[name.strip()] = float(val)
                         except ValueError:
-                            heuristics[name.strip()] = val.lower() not in ("false", "0", "no")
+                            if val.lower() in ("true", "false", "yes", "no"):
+                                heuristics[name.strip()] = val.lower() in ("true", "yes")
+                            else:
+                                heuristics[name.strip()] = val
 
         host = os.environ.get("PROXY_HOST", "0.0.0.0")
         port = int(os.environ.get("PROXY_PORT", "9000"))
@@ -152,6 +156,7 @@ class ProxyConfig:
             toon_only = srv.get("toon_only_tools", [])
             tool_token_limits = {k: int(v) for k, v in srv.get("tool_token_limits", {}).items()}
             srv_heuristics = srv.get("heuristics", {})
+            srv_tool_heuristics = srv.get("tool_heuristics", {})
 
             servers[name] = ServerConfig(
                 url=srv["url"],
@@ -166,6 +171,7 @@ class ProxyConfig:
                 max_token_limit=srv.get("max_token_limit", 0),
                 tool_token_limits=tool_token_limits,
                 heuristics=srv_heuristics,
+                tool_heuristics=srv_tool_heuristics,
             )
 
         return cls(

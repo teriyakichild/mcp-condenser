@@ -402,3 +402,64 @@ class TestToolCollisionDetection:
             "k8s_get_pods": "k8s",
             "other_k8s_get_pods": "other_k8s",
         }
+
+
+class TestToolHeuristicsMerge:
+    """Tests for per-tool heuristic overrides in _condense_item."""
+
+    def test_tool_override_merges(self):
+        """Tool-specific heuristic override is applied."""
+        cfg = ServerConfig(
+            url="http://localhost/mcp",
+            heuristics={"elide_timestamps": True},
+            tool_heuristics={"get_pods": {"elide_timestamps": False}},
+        )
+        mw = CondenserMiddleware(server_configs={"default": cfg})
+        data = json.dumps([
+            {"name": "a", "ts": "2024-01-01T00:00:00Z", "val": 1},
+            {"name": "b", "ts": "2024-01-01T00:00:01Z", "val": 2},
+            {"name": "c", "ts": "2024-01-01T00:00:02Z", "val": 3},
+        ])
+        result = mw._condense_item(data, "get_pods", cfg)
+        assert result is not None
+        condensed, _ = result
+        # Tool override sets elide_timestamps=False, so timestamps should appear
+        assert "2024-01-01T00:00:00Z" in condensed
+
+    def test_no_tool_override_uses_base(self):
+        """Without tool override, base heuristics are used."""
+        cfg = ServerConfig(
+            url="http://localhost/mcp",
+            heuristics={"elide_timestamps": False},
+            tool_heuristics={},
+        )
+        mw = CondenserMiddleware(server_configs={"default": cfg})
+        data = json.dumps([
+            {"name": "a", "ts": "2024-01-01T00:00:00Z", "val": 1},
+            {"name": "b", "ts": "2024-01-01T00:00:01Z", "val": 2},
+            {"name": "c", "ts": "2024-01-01T00:00:02Z", "val": 3},
+        ])
+        result = mw._condense_item(data, "some_tool", cfg)
+        assert result is not None
+        condensed, _ = result
+        # With elide_timestamps=False, timestamps should be in output
+        assert "2024-01-01T00:00:00Z" in condensed
+
+    def test_tool_override_overrides_base(self):
+        """Tool-specific value takes precedence over base."""
+        cfg = ServerConfig(
+            url="http://localhost/mcp",
+            heuristics={"elide_timestamps": True},
+            tool_heuristics={"get_pods": {"elide_timestamps": False}},
+        )
+        mw = CondenserMiddleware(server_configs={"default": cfg})
+        data = json.dumps([
+            {"name": "a", "ts": "2024-01-01T00:00:00Z", "val": 1},
+            {"name": "b", "ts": "2024-01-01T00:00:01Z", "val": 2},
+            {"name": "c", "ts": "2024-01-01T00:00:02Z", "val": 3},
+        ])
+        result = mw._condense_item(data, "get_pods", cfg)
+        assert result is not None
+        condensed, _ = result
+        # Tool override sets elide_timestamps=False, so timestamps should appear
+        assert "2024-01-01T00:00:00Z" in condensed

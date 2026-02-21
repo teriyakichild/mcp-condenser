@@ -103,6 +103,7 @@ def contains_or_numeric(answer: str, expected: str) -> bool:
 
 QUESTIONS: dict[str, list[tuple[str, str, callable]]] = {
     "toolresult.json": [
+        # --- direct lookups ---
         (
             "What is the node's available filesystem space in bytes?",
             "29417222144",
@@ -153,8 +154,35 @@ QUESTIONS: dict[str, list[tuple[str, str, callable]]] = {
             "11154280448",
             contains,
         ),
+        # --- harder: cross-reference, comparison, aggregation ---
+        (
+            "Which pod has the highest CPU usage (usageNanoCores)? Give the pod name only.",
+            "cilium-8z7hq",
+            contains,
+        ),
+        (
+            "How many unique namespaces are pods running in?",
+            "8",
+            contains_or_numeric,
+        ),
+        (
+            "How many pods are in the kube-system namespace?",
+            "3",
+            contains_or_numeric,
+        ),
+        (
+            "Which pod has the highest memory RSS bytes? Give the pod name only.",
+            "kafka",
+            contains,
+        ),
+        (
+            "Which system container uses the most CPU (usageNanoCores)? Give the name only.",
+            "pods",
+            contains,
+        ),
     ],
     "toolresult2_small.json": [
+        # --- direct lookups ---
         (
             "How many pods are listed in the pods array?",
             "6",
@@ -208,6 +236,42 @@ QUESTIONS: dict[str, list[tuple[str, str, callable]]] = {
         (
             "What is the opensearch pod's memory RSS bytes?",
             "824295424",
+            contains,
+        ),
+        # --- harder: cross-reference, comparison, filtering ---
+        (
+            "Which pod has the highest CPU usage (usageNanoCores)? Give the pod name only.",
+            "grafana",
+            contains,
+        ),
+        (
+            "How many pods are in the ecommerce-prod namespace?",
+            "3",
+            contains_or_numeric,
+        ),
+        (
+            "Which pod has the second highest memory RSS bytes? Give the pod name only.",
+            "grafana",
+            contains,
+        ),
+        (
+            "How many unique namespaces are pods running in?",
+            "3",
+            contains_or_numeric,
+        ),
+        (
+            "Which pod has the most volumes? Give the pod name only.",
+            "grafana",
+            contains,
+        ),
+        (
+            "What is the name of the grafana container that uses the most memory (rssBytes)?",
+            "grafana",
+            contains,
+        ),
+        (
+            "What is the opensearch container's rootfs used bytes?",
+            "2640306176",
             contains,
         ),
     ],
@@ -466,7 +530,7 @@ def main():
     args = parser.parse_args()
 
     # Parse heuristic overrides
-    heuristic_overrides: dict[str, bool | int | float] = {}
+    heuristic_overrides: dict[str, bool | int | float | str] = {}
     if args.heuristics:
         for pair in args.heuristics.split(","):
             pair = pair.strip()
@@ -479,7 +543,10 @@ def main():
                     try:
                         heuristic_overrides[name.strip()] = float(val)
                     except ValueError:
-                        heuristic_overrides[name.strip()] = val.lower() not in ("false", "0", "no")
+                        if val.lower() in ("true", "false", "yes", "no"):
+                            heuristic_overrides[name.strip()] = val.lower() in ("true", "yes")
+                        else:
+                            heuristic_overrides[name.strip()] = val
     args.heuristics_obj = Heuristics(**heuristic_overrides) if heuristic_overrides else None
     args.heuristic_overrides = heuristic_overrides
 

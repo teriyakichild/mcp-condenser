@@ -238,14 +238,16 @@ class CondenserMiddleware(Middleware):
 
         base_name = self._base_tool_name(tool_name)
 
-        # Build heuristics from config
-        if cfg.heuristics:
+        # Build heuristics from config, merging tool-specific overrides
+        merged = dict(cfg.heuristics)
+        merged.update(cfg.tool_heuristics.get(base_name, {}))
+        if merged:
             try:
-                h = Heuristics(**cfg.heuristics)
+                h = Heuristics(**merged)
             except TypeError as exc:
                 valid_keys = ", ".join(f.name for f in Heuristics.__dataclass_fields__.values())
                 raise TypeError(
-                    f"Invalid heuristics configuration {cfg.heuristics!r}: {exc}. "
+                    f"Invalid heuristics configuration {merged!r}: {exc}. "
                     f"Valid heuristic names are: {valid_keys}"
                 ) from exc
         else:
