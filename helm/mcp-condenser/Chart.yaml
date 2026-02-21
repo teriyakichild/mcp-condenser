@@ -3,4 +3,4 @@ name: mcp-condenser
 description: MCP proxy that condenses verbose JSON tool responses into compact TOON text
 type: application
 version: 0.1.0
-appVersion: "0.2.0"
+appVersion: "0.4.2"
