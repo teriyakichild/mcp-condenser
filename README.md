@@ -23,7 +23,7 @@ achieves 60-80% token reduction on real-world API responses.
 ```bash
 docker run -p 9000:9000 \
   -e UPSTREAM_MCP_URL=http://host.docker.internal:8080/mcp \
-  teriyakichild/mcp-condenser:0.4.2
+  teriyakichild/mcp-condenser:latest
 ```
 
 Point your MCP client at `http://localhost:9000/mcp`.
