@@ -359,15 +359,28 @@ def fits_context(text: str, ctx_limit: int) -> bool:
 # Run benchmark
 # ---------------------------------------------------------------------------
 
+def _status(icon: str, fmt: str, fixture: str, question: str, elapsed: float = 0):
+    """Print a live status line to stderr."""
+    q = question[:60]
+    print(f"  {icon} [{fmt:<4}] {fixture:<24} {q:<62} {elapsed:>5.1f}s", file=sys.stderr)
+
+
 def run_benchmark(args) -> list[dict]:
     """Run all benchmark questions and return results."""
     fixtures_dir = Path(args.fixtures_dir)
     results = []
 
+    total_q = sum(len(qs) for qs in QUESTIONS.values())
+    formats = 1 if args.toon_only else 2
+    total_calls = total_q * formats
+    done = 0
+
     h = getattr(args, 'heuristics_obj', None)
     for fixture, questions in QUESTIONS.items():
         raw, data = load_sample(fixtures_dir, fixture)
         condensed = condense_json(data, heuristics=h)
+
+        print(f"\n  --- {fixture} ({len(questions)} questions) ---", file=sys.stderr)
 
         for question, expected, match_fn in questions:
             # JSON baseline (unless --toon-only)
@@ -383,6 +396,8 @@ def run_benchmark(args) -> list[dict]:
                         "answer": "(skipped: too large for context)",
                         "expected": expected,
                     })
+                    done += 1
+                    _status("-", "json", fixture, question)
                 else:
                     t0 = time.perf_counter()
                     answer = ask_ollama(args.model, raw, question, host=args.host, num_ctx=args.num_ctx)
@@ -398,6 +413,9 @@ def run_benchmark(args) -> list[dict]:
                         "answer": answer.strip(),
                         "expected": expected,
                     })
+                    done += 1
+                    icon = "+" if passed else "x"
+                    _status(icon, "json", fixture, question, elapsed)
 
             # Condensed TOON
             if not fits_context(condensed, args.ctx):
@@ -411,6 +429,8 @@ def run_benchmark(args) -> list[dict]:
                     "answer": "(skipped: too large for context)",
                     "expected": expected,
                 })
+                done += 1
+                _status("-", "toon", fixture, question)
             else:
                 t0 = time.perf_counter()
                 answer = ask_ollama(args.model, condensed, question, host=args.host, num_ctx=args.num_ctx)
@@ -426,7 +446,13 @@ def run_benchmark(args) -> list[dict]:
                     "answer": answer.strip(),
                     "expected": expected,
                 })
+                done += 1
+                icon = "+" if passed else "x"
+                _status(icon, "toon", fixture, question, elapsed)
 
+        print(f"  ({done}/{total_calls} complete)", file=sys.stderr)
+
+    print(file=sys.stderr)
     return results
 
 
