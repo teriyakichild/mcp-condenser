@@ -7,6 +7,7 @@ Requires a running Ollama server. Run with:
 """
 
 import argparse
+import datetime
 import json
 import re
 import sys
@@ -20,30 +21,34 @@ from mcp_condenser.condenser import condense_json, count_tokens
 # Ollama helper
 # ---------------------------------------------------------------------------
 
-def ask_ollama(model: str, context: str, question: str, host: str = "http://localhost:11434") -> str:
+def ask_ollama(model: str, context: str, question: str, host: str = "http://localhost:11434", num_ctx: int = 0) -> str:
     """Send a question + context to Ollama and return the response text."""
     import httpx
 
+    body = {
+        "model": model,
+        "stream": False,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a data analyst. Answer questions about the "
+                    "provided data concisely. Give only the answer value, "
+                    "no explanation."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"DATA:\n{context}\n\nQUESTION: {question}",
+            },
+        ],
+    }
+    if num_ctx > 0:
+        body["options"] = {"num_ctx": num_ctx}
+
     resp = httpx.post(
         f"{host}/api/chat",
-        json={
-            "model": model,
-            "stream": False,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a data analyst. Answer questions about the "
-                        "provided data concisely. Give only the answer value, "
-                        "no explanation."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"DATA:\n{context}\n\nQUESTION: {question}",
-                },
-            ],
-        },
+        json=body,
         timeout=300.0,
     )
     resp.raise_for_status()
@@ -253,7 +258,7 @@ def run_benchmark(args) -> list[dict]:
                     })
                 else:
                     t0 = time.perf_counter()
-                    answer = ask_ollama(args.model, raw, question, host=args.host)
+                    answer = ask_ollama(args.model, raw, question, host=args.host, num_ctx=args.num_ctx)
                     elapsed = time.perf_counter() - t0
                     passed = match_fn(answer, expected)
                     results.append({
@@ -263,7 +268,7 @@ def run_benchmark(args) -> list[dict]:
                         "tokens": count_tokens(raw),
                         "elapsed": elapsed,
                         "passed": passed,
-                        "answer": answer.strip()[:80],
+                        "answer": answer.strip(),
                         "expected": expected,
                     })
 
@@ -281,7 +286,7 @@ def run_benchmark(args) -> list[dict]:
                 })
             else:
                 t0 = time.perf_counter()
-                answer = ask_ollama(args.model, condensed, question, host=args.host)
+                answer = ask_ollama(args.model, condensed, question, host=args.host, num_ctx=args.num_ctx)
                 elapsed = time.perf_counter() - t0
                 passed = match_fn(answer, expected)
                 results.append({
@@ -291,7 +296,7 @@ def run_benchmark(args) -> list[dict]:
                     "tokens": count_tokens(condensed),
                     "elapsed": elapsed,
                     "passed": passed,
-                    "answer": answer.strip()[:80],
+                    "answer": answer.strip(),
                     "expected": expected,
                 })
 
@@ -356,11 +361,44 @@ def print_summary(results: list[dict], fixtures_dir: Path):
         print(f"  {'Speedup:':<20} {json_time/toon_time:.1f}x")
     print()
 
+    # Failure details
+    failures = [r for r in results if r["passed"] is False]
+    if failures:
+        print("=" * 80)
+        print("  Failure Details")
+        print("=" * 80)
+        for r in failures:
+            print()
+            print(f"  Fixture:  {r['fixture']}")
+            print(f"  Format:   {r['format']}")
+            print(f"  Question: {r['question']}")
+            print(f"  Expected: {r['expected']}")
+            print(f"  Got:      {r['answer']}")
+            print(f"  {'-' * 76}")
+        print()
+
 
 def print_json(results: list[dict]):
     """Print results as JSON for machine consumption."""
     json.dump(results, sys.stdout, indent=2)
     print()
+
+
+def log_failures(results: list[dict], model: str, log_path: Path):
+    """Append failed results to a JSONL log file for tracking over time."""
+    failures = [r for r in results if r["passed"] is False]
+    if not failures:
+        return
+    timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, "a") as f:
+        for r in failures:
+            entry = {
+                "timestamp": timestamp,
+                "model": model,
+                **r,
+            }
+            f.write(json.dumps(entry) + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -388,6 +426,12 @@ def main():
         help="Model context window size in tokens (default: 128000)",
     )
     parser.add_argument(
+        "--num-ctx",
+        type=int,
+        default=0,
+        help="Ollama num_ctx option — caps the context window the model allocates (0 = use model default)",
+    )
+    parser.add_argument(
         "--fixtures-dir",
         default="tests/fixtures",
         help="Path to fixture files (default: tests/fixtures)",
@@ -404,8 +448,16 @@ def main():
         help="Skip JSON baseline (halves runtime)",
     )
 
+    parser.add_argument(
+        "--failures-log",
+        default="benchmarks/failures.jsonl",
+        help="Path to JSONL failure log (default: benchmarks/failures.jsonl)",
+    )
+
     args = parser.parse_args()
     results = run_benchmark(args)
+
+    log_failures(results, args.model, Path(args.failures_log))
 
     if args.json_output:
         print_json(results)

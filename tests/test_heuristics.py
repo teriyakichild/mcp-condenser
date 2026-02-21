@@ -53,6 +53,7 @@ class TestHeuristicsDataclass:
         assert h.elide_timestamps is True
         assert h.elide_constants is True
         assert h.group_tuples is True
+        assert h.max_tuple_size == 4
 
     def test_override_single(self):
         h = Heuristics(elide_timestamps=False)
@@ -177,6 +178,56 @@ class TestCondenseJsonWithHeuristics:
         # All column values should be present
         assert "zero_col" in result
         assert "const_col" in result
+
+
+class TestMaxTupleSizeToggle:
+    def _make_wide_rows(self):
+        """Rows with a 6-member numeric group (memory.*) and a 3-member group (vec.*)."""
+        return [
+            {
+                "name": "a",
+                "memory": {"availableBytes": 1, "majorPageFaults": 2, "pageFaults": 3,
+                           "rssBytes": 4, "usageBytes": 5, "workingSetBytes": 6},
+                "vec": {"x": 10, "y": 20, "z": 30},
+            },
+            {
+                "name": "b",
+                "memory": {"availableBytes": 7, "majorPageFaults": 8, "pageFaults": 9,
+                           "rssBytes": 10, "usageBytes": 11, "workingSetBytes": 12},
+                "vec": {"x": 40, "y": 50, "z": 60},
+            },
+            {
+                "name": "c",
+                "memory": {"availableBytes": 13, "majorPageFaults": 14, "pageFaults": 15,
+                           "rssBytes": 16, "usageBytes": 17, "workingSetBytes": 18},
+                "vec": {"x": 70, "y": 80, "z": 90},
+            },
+        ]
+
+    def test_default_max_skips_large_groups(self):
+        """6-member group should NOT be grouped at default max_tuple_size=4."""
+        rows = self._make_wide_rows()
+        _, _, final = preprocess_table("t", rows, Heuristics())
+        headers = [h for h, _ in final]
+        # memory group (6 members) should NOT be grouped
+        assert not any("memory(" in h for h in headers)
+        # individual memory columns should be preserved
+        assert "memory.availableBytes" in headers
+        assert "memory.workingSetBytes" in headers
+
+    def test_small_group_still_grouped(self):
+        """3-member group should still be grouped at default max_tuple_size=4."""
+        rows = self._make_wide_rows()
+        _, _, final = preprocess_table("t", rows, Heuristics())
+        headers = [h for h, _ in final]
+        assert any("vec(" in h for h in headers)
+
+    def test_custom_max_allows_larger(self):
+        """max_tuple_size=6 should allow the 6-member group."""
+        rows = self._make_wide_rows()
+        _, _, final = preprocess_table("t", rows, Heuristics(max_tuple_size=6))
+        headers = [h for h, _ in final]
+        assert any("memory(" in h for h in headers)
 
 
 class TestInvalidHeuristicKey:

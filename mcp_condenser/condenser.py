@@ -32,6 +32,7 @@ class Heuristics:
     elide_timestamps: bool = True
     elide_constants: bool = True
     group_tuples: bool = True
+    max_tuple_size: int = 4
 
 try:
     import tiktoken
@@ -141,13 +142,26 @@ def union_columns(arr: list) -> list[str]:
     return list(keys)
 
 
-def find_identity_column(cols: list[str]) -> str | None:
-    """Find the best identity column for back-references."""
+def find_identity_column(cols: list[str], arr: list | None = None) -> str | None:
+    """Find the best identity column for back-references.
+
+    When *arr* is provided and multiple columns match the same keyword,
+    the column with the highest cardinality (distinct non-empty values)
+    wins.  Falls back to first-match when arr is None.
+    """
     id_kw = ["name", "id", "uid"]
     for kw in id_kw:
-        for c in cols:
-            if c.split(".")[-1].lower() == kw:
-                return c
+        matches = [c for c in cols if c.split(".")[-1].lower() == kw]
+        if not matches:
+            continue
+        if len(matches) == 1 or arr is None:
+            return matches[0]
+        # Pick the column with the most distinct non-empty values
+        def _cardinality(col: str) -> int:
+            vals = {fmt(flatten(item).get(col)) for item in arr}
+            vals.discard("")
+            return len(vals)
+        return max(matches, key=_cardinality)
     return cols[0] if cols else None
 
 
@@ -313,7 +327,7 @@ def preprocess_table(name: str, arr: list, heuristics: Heuristics | None = None)
     tuple_map = OrderedDict()
     for prefix, members in tuples.items():
         live = [m for m in members if m not in elided]
-        if len(live) >= 3:
+        if len(live) >= 3 and len(live) <= heuristics.max_tuple_size:
             leaves = [m.rsplit(".", 1)[1] for m in live]
             header = f"{prefix}({','.join(leaves)})"
             tuple_map[header] = live
@@ -378,7 +392,7 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
 
     # Determine parent identity column for back-references
     scalar_cols = order_columns(union_columns(arr))
-    id_col = find_identity_column(scalar_cols)
+    id_col = find_identity_column(scalar_cols, arr)
 
     # Collect sub-table data for each array field
     sub_tables = {}

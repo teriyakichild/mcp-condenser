@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 import pytest
 
-from mcp_condenser.condenser import classify, flatten, is_homogeneous_array, condense_json, toon_encode_json, parse_input, truncate_to_token_limit, count_tokens
+from mcp_condenser.condenser import classify, flatten, find_identity_column, is_homogeneous_array, condense_json, toon_encode_json, parse_input, truncate_to_token_limit, count_tokens
 
 
 class TestClassify:
@@ -273,3 +273,34 @@ class TestTruncateToTokenLimit:
         tokens = count_tokens(text)
         result = truncate_to_token_limit(text, tokens)
         assert result == text
+
+
+class TestFindIdentityColumn:
+    def test_prefers_higher_cardinality_name(self):
+        """podRef.name (unique) should beat network.name (constant 'eth0')."""
+        cols = ["network.name", "podRef.name", "cpu.usageNanoCores"]
+        arr = [
+            {"network": {"name": "eth0"}, "podRef": {"name": "pod-a"}, "cpu": {"usageNanoCores": 100}},
+            {"network": {"name": "eth0"}, "podRef": {"name": "pod-b"}, "cpu": {"usageNanoCores": 200}},
+            {"network": {"name": "eth0"}, "podRef": {"name": "pod-c"}, "cpu": {"usageNanoCores": 300}},
+        ]
+        assert find_identity_column(cols, arr) == "podRef.name"
+
+    def test_empty_vs_unique_name(self):
+        """Empty-valued column loses to unique-valued column."""
+        cols = ["network.name", "podRef.name"]
+        arr = [
+            {"network": {"name": ""}, "podRef": {"name": "pod-a"}},
+            {"network": {"name": ""}, "podRef": {"name": "pod-b"}},
+        ]
+        assert find_identity_column(cols, arr) == "podRef.name"
+
+    def test_no_arr_falls_back_to_first_match(self):
+        """Without arr, first column matching keyword wins (backwards compat)."""
+        cols = ["network.name", "podRef.name"]
+        assert find_identity_column(cols) == "network.name"
+
+    def test_fallback_to_first_col(self):
+        """No keyword match returns first column."""
+        cols = ["cpu.usageNanoCores", "memory.rssBytes"]
+        assert find_identity_column(cols) == "cpu.usageNanoCores"

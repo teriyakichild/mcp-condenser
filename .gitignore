@@ -13,3 +13,6 @@ wheels/
 out
 /*.json
 research.md
+
+# Benchmark logs
+benchmarks/failures.jsonl
