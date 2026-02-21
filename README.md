@@ -83,31 +83,15 @@ configurable chart values.
 
 ## Configuration reference
 
-### Environment variables (single-upstream mode)
+See [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) for the full reference,
+including all environment variables, config file schema, condensing heuristics,
+and Helm chart values.
 
-| Variable | Default | Description |
-|---|---|---|
-| `UPSTREAM_MCP_URL` | *(required)* | URL of the upstream MCP server |
-| `UPSTREAM_MCP_HEADERS` | *(empty)* | JSON object of headers to send upstream |
-| `CONDENSE_TOOLS` | `*` | Comma-separated tool names to condense, or `*` for all |
-| `TOON_ONLY_TOOLS` | *(empty)* | Comma-separated tool names for direct TOON encoding |
-| `TOON_FALLBACK` | `true` | Apply basic TOON encoding to tool responses not covered by `CONDENSE_TOOLS` |
-| `MIN_TOKEN_THRESHOLD` | `0` | Skip condensing below this token count (0 = off) |
-| `REVERT_IF_LARGER` | `false` | Keep original if condensed is larger |
-| `MAX_TOKEN_LIMIT` | `0` | Global token cap (0 = off) |
-| `TOOL_TOKEN_LIMITS` | *(empty)* | `tool:limit` pairs (comma-separated) |
-| `PROXY_HOST` | `0.0.0.0` | Bind host |
-| `PROXY_PORT` | `9000` | Bind port |
-
-### Config file (multi-upstream mode)
-
-Each server block supports tool filtering (`tools`), a per-server condense
-toggle (`condense`), static headers (`headers`), and selective header forwarding
-from the client (`forward_headers`). See
-[`examples/docker-compose/config.json`](examples/docker-compose/config.json)
-for the full schema and
-[`helm/mcp-condenser/values.yaml`](helm/mcp-condenser/values.yaml) for the
-Helm equivalents.
+Quick links:
+- [Single-upstream mode (env vars)](docs/CONFIGURATION.md#single-upstream-mode-environment-variables)
+- [Multi-upstream mode (config file)](docs/CONFIGURATION.md#multi-upstream-mode-config-file)
+- [Condensing heuristics](docs/CONFIGURATION.md#heuristics)
+- [Helm chart values](docs/CONFIGURATION.md#helm-chart)
 
 ## CLI usage
 
