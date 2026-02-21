@@ -1,0 +1,17 @@
+# Multi-upstream mode — aggregate and condense multiple MCP servers.
+#
+# Usage:
+#   docker compose -f docker-compose.multi.yml up
+#
+# Then configure your MCP client to connect to:
+#   http://localhost:9000/mcp
+
+services:
+  mcp-condenser:
+    image: teriyakichild/mcp-condenser:0.4.2
+    ports:
+      - "9000:9000"
+    environment:
+      CONDENSER_CONFIG: /etc/mcp-condenser/config.json
+    volumes:
+      - ./config.json:/etc/mcp-condenser/config.json:ro

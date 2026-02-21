@@ -193,6 +193,8 @@ docker build -t mcp-condenser .
 docker run -e UPSTREAM_MCP_URL=http://host.docker.internal:8080/mcp mcp-condenser
 ```
 
+See [examples/docker-compose/](examples/docker-compose/) for Docker Compose quick-start files.
+
 ## Helm
 
 A Helm chart is included under `helm/mcp-condenser/`:
@@ -209,7 +211,8 @@ helm install mcp-condenser ./helm/mcp-condenser \
   --set-json 'config.condenserConfig={"servers":{"k8s":{"url":"http://k8s:8080/mcp"}}}'
 ```
 
-See `helm/mcp-condenser/values.yaml` for all configurable values.
+See `helm/mcp-condenser/values.yaml` for all configurable values, and
+[examples/helm/](examples/helm/) for values files and a Helmfile example.
 
 ## Development
 

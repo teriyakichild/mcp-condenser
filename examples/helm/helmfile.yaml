@@ -1,0 +1,12 @@
+# Helmfile example
+#
+# Usage:
+#   helmfile apply
+
+releases:
+  - name: mcp-condenser
+    namespace: mcp
+    chart: ./helm/mcp-condenser
+    values:
+      - values-single.yaml
+      # - values-multi.yaml

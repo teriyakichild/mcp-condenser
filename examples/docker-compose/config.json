@@ -1,0 +1,26 @@
+{
+  "servers": {
+    "k8s": {
+      "url": "http://host.docker.internal:8080/mcp",
+      "tools": "*",
+      "condense": true,
+      "max_token_limit": 4000,
+      "tool_token_limits": {
+        "get_pods": 3000
+      }
+    },
+    "github": {
+      "url": "http://host.docker.internal:8081/mcp",
+      "tools": "*",
+      "condense": false,
+      "headers": {
+        "Authorization": "Bearer ghp_xxxxxxxxxxxx"
+      }
+    }
+  },
+  "global": {
+    "port": 9000,
+    "prefix_tools": true,
+    "metrics_enabled": false
+  }
+}

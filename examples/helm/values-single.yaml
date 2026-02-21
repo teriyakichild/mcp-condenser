@@ -1,0 +1,23 @@
+# Single-upstream mode
+#
+# Usage:
+#   helm install mcp-condenser ./helm/mcp-condenser -f examples/helm/values-single.yaml
+
+image:
+  repository: teriyakichild/mcp-condenser
+  tag: "0.4.2"
+
+config:
+  upstreamMcpUrl: "http://my-mcp-server:8080/mcp"
+  condenseTools: "*"
+  # upstreamMcpHeaders: '{"Authorization":"Bearer your-token"}'
+  # maxTokenLimit: "4000"
+  # toolTokenLimits: "get_pods:3000,get_nodes:2000"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
