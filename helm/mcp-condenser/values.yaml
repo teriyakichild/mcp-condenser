@@ -20,6 +20,7 @@ config:
   revertIfLarger: "false"  # keep original response if condensed has more tokens
   maxTokenLimit: "0"  # global default token cap for all tool responses (0 = off)
   toolTokenLimits: ""  # comma-separated tool_name:limit pairs for per-tool overrides
+  heuristics: ""  # comma-separated key:bool pairs to toggle condensing heuristics (e.g. "elide_timestamps:false,group_tuples:false")
   proxyPort: 9000
 
   # Multi-upstream mode (set condenserConfig to JSON config content)

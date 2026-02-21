@@ -64,6 +64,8 @@ spec:
               value: {{ .Values.config.maxTokenLimit | quote }}
             - name: TOOL_TOKEN_LIMITS
               value: {{ .Values.config.toolTokenLimits | quote }}
+            - name: CONDENSER_HEURISTICS
+              value: {{ .Values.config.heuristics | quote }}
             - name: PROXY_HOST
               value: "0.0.0.0"
             - name: PROXY_PORT
