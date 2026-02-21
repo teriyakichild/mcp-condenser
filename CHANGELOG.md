@@ -1,6 +1,71 @@
 # CHANGELOG
 
 
+## v0.5.0 (2026-02-21)
+
+### Bug Fixes
+
+- Address review feedback on heuristics config
+  ([`b115c0a`](https://github.com/teriyakichild/mcp-condenser/commit/b115c0ab46ff0f7f3cb361ae2d6b2ea437568816))
+
+- Wrap Heuristics(**cfg.heuristics) in try/except to surface helpful error on typos listing valid
+  key names - Add config parsing tests for CONDENSER_HEURISTICS env var and from_file heuristics
+  dict - Add test for invalid heuristic key error message - List valid heuristic keys in helm
+  values.yaml comment
+
+### Chores
+
+- Sync uv.lock with pyproject.toml version 0.4.2
+  ([`db34015`](https://github.com/teriyakichild/mcp-condenser/commit/db34015e941af94a29d4758513cdf2516d3141c1))
+
+### Documentation
+
+- Add Docker Compose and Helm deployment examples
+  ([`1f63415`](https://github.com/teriyakichild/mcp-condenser/commit/1f634152ff3d5083c09af85c68de1ac62b43d38c))
+
+Add examples/ directory with quick-start files for both Docker Compose (single and multi-upstream)
+  and Helm (values files and Helmfile). Link to the new examples from the README.
+
+- Improve README accuracy and clarity
+  ([`6b1927a`](https://github.com/teriyakichild/mcp-condenser/commit/6b1927ae8a4139591f581d5aed0cf17494f78711))
+
+Fix broken quick start (add -p 9000:9000, note about host.docker.internal on Linux). Rewrite
+  subheading and How it works for accuracy: drop "JSON objects" since YAML is also supported,
+  replace jargon (elide, homogeneous arrays, numeric tuples) with plain language, explain
+  clustered-timestamp condensing. Clarify TOON_FALLBACK description, add transition between Docker
+  and source-based usage, restore benchmark summary sentence, and document key config file options
+  inline.
+
+- Revamp README and bump chart appVersion to 0.4.2
+  ([`4399dff`](https://github.com/teriyakichild/mcp-condenser/commit/4399dffc854fbfd2c3ed0e657cd6c29fa84b93e7))
+
+Rewrite README with a leaner get-started-fast structure: docker run quick start, brief proxy usage
+  sections, and env var reference table. Move verbose config examples, header-forwarding docs, and
+  per-server tables out of README in favor of links to examples/ and values.yaml. Update Helm chart
+  appVersion from 0.2.0 to 0.4.2.
+
+### Features
+
+- Add tunable condensing heuristics
+  ([`6f50782`](https://github.com/teriyakichild/mcp-condenser/commit/6f507821dc1e49c976cece84bb37dd31cca036cc))
+
+Make each preprocessing heuristic in preprocess_table() individually toggleable via config, so users
+  can disable specific elisions (e.g. timestamp clustering) without switching to toon_only mode.
+
+New Heuristics dataclass with 5 boolean fields (all default true): elide_all_zero, elide_all_null,
+  elide_timestamps, elide_constants, group_tuples. Configurable via CONDENSER_HEURISTICS env var or
+  per-server "heuristics" dict in the config file. Helm chart updated with the new config value.
+
+### Testing
+
+- Add accuracy benchmark for TOON condensed output
+  ([`66912b9`](https://github.com/teriyakichild/mcp-condenser/commit/66912b92aa40f301fee71c9402b9ad883e449b12))
+
+Ollama-based benchmark that verifies an LLM can answer factual questions from condensed TOON output
+  vs raw JSON. Includes two fixture sets (toolresult.json, toolresult2_small.json) with 21 total
+  questions and configurable model/context settings.
+
+
 ## v0.4.2 (2026-02-20)
 
 ### Bug Fixes
