@@ -35,6 +35,7 @@ class Heuristics:
     max_tuple_size: int = 4
     max_table_columns: int = 0       # 0 = no limit
     elide_mostly_zero_pct: float = 0.0  # 0.0 = disabled
+    pivot_key_value: bool = True
 
 try:
     import tiktoken
@@ -132,6 +133,63 @@ def is_homogeneous_array(arr: list) -> bool:
     for item in arr:
         common &= set(k for k, v in flatten(item).items() if not isinstance(v, list))
     return len(common) >= len(union) * 0.6
+
+
+def is_kv_array(arr: list) -> bool:
+    """Check if array is a list of {Key: str, Value: any} dicts (AWS tag convention)."""
+    if not arr or not isinstance(arr, list):
+        return False
+    for item in arr:
+        if not isinstance(item, dict):
+            return False
+        if set(item.keys()) != {"Key", "Value"}:
+            return False
+        if not isinstance(item["Key"], str):
+            return False
+    return True
+
+
+def pivot_kv_fields(items: list[dict]) -> list[dict]:
+    """Pivot Key-Value array fields into scalar columns on each item.
+
+    For each field that is a KV array (every element is {Key: str, Value: any})
+    across all items, replace it with scalar columns named ``field.key_name``.
+    Missing keys get empty string. Non-KV list fields are left untouched.
+    """
+    if not items:
+        return items
+
+    # Find fields that are KV arrays across all items that have them
+    kv_fields: dict[str, set[str]] = {}
+    for item in items:
+        for k, v in item.items():
+            if isinstance(v, list) and is_kv_array(v):
+                if k not in kv_fields:
+                    kv_fields[k] = set()
+                kv_fields[k].update(entry["Key"] for entry in v)
+
+    if not kv_fields:
+        return items
+
+    result = []
+    for item in items:
+        new_item = OrderedDict()
+        for k, v in item.items():
+            if k in kv_fields and isinstance(v, list) and is_kv_array(v):
+                lookup = {entry["Key"]: entry["Value"] for entry in v}
+                for tag_key in sorted(kv_fields[k]):
+                    new_item[f"{k}.{tag_key}"] = lookup.get(tag_key, "")
+            else:
+                new_item[k] = v
+        # Fill in missing pivoted keys (item had no array for this field at all)
+        for field, keys in kv_fields.items():
+            if field not in item or not isinstance(item.get(field), list):
+                for tag_key in sorted(keys):
+                    col = f"{field}.{tag_key}"
+                    if col not in new_item:
+                        new_item[col] = ""
+        result.append(new_item)
+    return result
 
 
 def union_columns(arr: list) -> list[str]:
@@ -417,9 +475,15 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
         return [f"--- {name} ---\n(empty)"]
 
     blocks = []
+    if heuristics is None:
+        heuristics = Heuristics()
+
+    # Flatten and optionally pivot KV arrays into scalar columns
+    all_flat = [flatten(item) for item in arr]
+    if heuristics.pivot_key_value:
+        all_flat = pivot_kv_fields(all_flat)
 
     # Extract nested array fields before column analysis
-    all_flat = [flatten(item) for item in arr]
     array_fields = set()
     for fl in all_flat:
         for k, v in fl.items():
@@ -427,15 +491,14 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
                 array_fields.add(k)
 
     # Determine parent identity column for back-references
-    scalar_cols = order_columns(union_columns(arr))
-    id_col = find_identity_column(scalar_cols, arr)
+    scalar_cols = order_columns(union_columns(all_flat))
+    id_col = find_identity_column(scalar_cols, all_flat)
 
     # Collect sub-table data for each array field
     sub_tables = {}
     for af in sorted(array_fields):
         sub_items = []
-        for item in arr:
-            fl = flatten(item)
+        for fl in all_flat:
             parent_id = fmt(fl.get(id_col, "")) if id_col else ""
             arr_val = fl.get(af, [])
             if isinstance(arr_val, list):
@@ -445,6 +508,8 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
                         tagged[f"_parent.{id_col}"] = parent_id
                         tagged.update(flatten(sub))
                         sub_items.append(tagged)
+        if heuristics.pivot_key_value:
+            sub_items = pivot_kv_fields(sub_items)
         if sub_items and len(sub_items) >= 2:
             # Check if these form a homogeneous collection
             sub_keys = set()
@@ -456,9 +521,9 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
             if len(common) >= 2:
                 sub_tables[af] = sub_items
 
-    # Now preprocess the parent table (array fields are excluded by union_columns
-    # since flatten keeps arrays as-is and union_columns skips them)
-    annotations, cleaned_rows, final_cols = preprocess_table(name, arr, heuristics)
+    # Now preprocess the parent table using pivoted flat dicts
+    # (array fields are excluded by union_columns since they skip list values)
+    annotations, cleaned_rows, final_cols = preprocess_table(name, all_flat, heuristics)
 
     # Encode with TOON
     toon_text = toon_format.encode(cleaned_rows)

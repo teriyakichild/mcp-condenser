@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 import pytest
 
-from mcp_condenser.condenser import classify, flatten, find_identity_column, is_homogeneous_array, condense_json, toon_encode_json, parse_input, truncate_to_token_limit, count_tokens
+from mcp_condenser.condenser import classify, flatten, find_identity_column, is_homogeneous_array, is_kv_array, pivot_kv_fields, condense_json, toon_encode_json, parse_input, truncate_to_token_limit, count_tokens
 
 
 class TestClassify:
@@ -304,3 +304,137 @@ class TestFindIdentityColumn:
         """No keyword match returns first column."""
         cols = ["cpu.usageNanoCores", "memory.rssBytes"]
         assert find_identity_column(cols) == "cpu.usageNanoCores"
+
+
+class TestIsKvArray:
+    def test_valid_kv_array(self):
+        arr = [{"Key": "Name", "Value": "web"}, {"Key": "Env", "Value": "prod"}]
+        assert is_kv_array(arr) is True
+
+    def test_empty_array(self):
+        assert is_kv_array([]) is False
+
+    def test_non_dict_elements(self):
+        assert is_kv_array(["a", "b"]) is False
+
+    def test_extra_keys(self):
+        arr = [{"Key": "Name", "Value": "web", "Extra": "x"}]
+        assert is_kv_array(arr) is False
+
+    def test_wrong_key_names(self):
+        arr = [{"key": "Name", "value": "web"}]
+        assert is_kv_array(arr) is False
+
+    def test_numeric_value(self):
+        arr = [{"Key": "Port", "Value": 8080}]
+        assert is_kv_array(arr) is True
+
+    def test_non_string_key(self):
+        arr = [{"Key": 123, "Value": "web"}]
+        assert is_kv_array(arr) is False
+
+    def test_single_element(self):
+        arr = [{"Key": "Name", "Value": "web"}]
+        assert is_kv_array(arr) is True
+
+    def test_not_a_list(self):
+        assert is_kv_array("not a list") is False
+
+
+class TestPivotKvFields:
+    def test_basic_pivot(self):
+        items = [
+            {"id": "i-1", "Tags": [{"Key": "Name", "Value": "web"}, {"Key": "Env", "Value": "prod"}]},
+            {"id": "i-2", "Tags": [{"Key": "Name", "Value": "api"}, {"Key": "Env", "Value": "staging"}]},
+        ]
+        result = pivot_kv_fields(items)
+        assert result[0]["Tags.Env"] == "prod"
+        assert result[0]["Tags.Name"] == "web"
+        assert result[1]["Tags.Env"] == "staging"
+        assert result[1]["Tags.Name"] == "api"
+        # Original Tags list should be gone
+        assert "Tags" not in result[0]
+
+    def test_missing_keys_filled(self):
+        items = [
+            {"id": "i-1", "Tags": [{"Key": "Name", "Value": "web"}]},
+            {"id": "i-2", "Tags": [{"Key": "Name", "Value": "api"}, {"Key": "Env", "Value": "prod"}]},
+        ]
+        result = pivot_kv_fields(items)
+        assert result[0]["Tags.Env"] == ""
+        assert result[0]["Tags.Name"] == "web"
+        assert result[1]["Tags.Env"] == "prod"
+
+    def test_noop_passthrough(self):
+        items = [
+            {"id": "i-1", "status": "running"},
+            {"id": "i-2", "status": "stopped"},
+        ]
+        result = pivot_kv_fields(items)
+        assert result == items
+
+    def test_mixed_kv_and_non_kv(self):
+        items = [
+            {"id": "i-1", "Tags": [{"Key": "Name", "Value": "web"}], "ports": [80, 443]},
+            {"id": "i-2", "Tags": [{"Key": "Name", "Value": "api"}], "ports": [8080]},
+        ]
+        result = pivot_kv_fields(items)
+        assert result[0]["Tags.Name"] == "web"
+        assert result[0]["ports"] == [80, 443]  # non-KV list left untouched
+
+    def test_empty_input(self):
+        assert pivot_kv_fields([]) == []
+
+
+class TestEc2TagsPivot:
+    """Integration test with EC2-like nested data."""
+
+    def test_tags_become_columns(self):
+        data = {
+            "Reservations": [
+                {
+                    "ReservationId": "r-001",
+                    "Instances": [
+                        {
+                            "InstanceId": "i-aaa",
+                            "State": {"Name": "running"},
+                            "Tags": [
+                                {"Key": "Name", "Value": "web-1"},
+                                {"Key": "Environment", "Value": "production"},
+                            ],
+                        },
+                        {
+                            "InstanceId": "i-bbb",
+                            "State": {"Name": "stopped"},
+                            "Tags": [
+                                {"Key": "Name", "Value": "web-2"},
+                                {"Key": "Environment", "Value": "staging"},
+                            ],
+                        },
+                    ],
+                },
+                {
+                    "ReservationId": "r-002",
+                    "Instances": [
+                        {
+                            "InstanceId": "i-ccc",
+                            "State": {"Name": "running"},
+                            "Tags": [
+                                {"Key": "Name", "Value": "api-1"},
+                                {"Key": "Environment", "Value": "production"},
+                                {"Key": "Team", "Value": "backend"},
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+        result = condense_json(data)
+        # Pivoted tag columns should appear
+        assert "Tags.Name" in result
+        assert "Tags.Environment" in result
+        assert "web-1" in result
+        assert "production" in result
+        assert "api-1" in result
+        # Should NOT have a separate sub-table for Tags
+        assert "Instances.Tags" not in result

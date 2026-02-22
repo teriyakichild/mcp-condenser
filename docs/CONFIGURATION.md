@@ -142,6 +142,7 @@ that would otherwise be elided.
 | `elide_timestamps` | `true` | Collapse timestamps within a 60-second window into a single representative value |
 | `elide_constants` | `true` | Remove columns with an identical value across all rows (noted in a header annotation) |
 | `group_tuples` | `true` | Group related columns with a shared prefix (e.g. `requests.cpu` + `requests.memory`) into combined columns |
+| `pivot_key_value` | `true` | Pivot `[{Key, Value}]` arrays (e.g. AWS EC2 Tags) into scalar columns on the parent row (`Tags.Name`, `Tags.Environment`, etc.) |
 
 ### Setting heuristics via environment variable
 

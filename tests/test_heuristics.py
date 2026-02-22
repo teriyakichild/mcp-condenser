@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from mcp_condenser.condenser import Heuristics, condense_json, preprocess_table
+from mcp_condenser.condenser import Heuristics, condense_json, preprocess_table, render_table
 from mcp_condenser.config import ServerConfig
 from mcp_condenser.proxy import CondenserMiddleware
 
@@ -56,6 +56,7 @@ class TestHeuristicsDataclass:
         assert h.max_tuple_size == 4
         assert h.max_table_columns == 0
         assert h.elide_mostly_zero_pct == 0.0
+        assert h.pivot_key_value is True
 
     def test_override_single(self):
         h = Heuristics(elide_timestamps=False)
@@ -333,6 +334,38 @@ class TestElideMostlyZero:
         assert not any("mostly_zero" in a for a in annotations)
         assert any("mostly_zero_col" in row for row in cleaned)
 
+
+
+class TestPivotKeyValueToggle:
+    def _make_tagged_rows(self):
+        return [
+            {"InstanceId": "i-aaa", "Tags": [{"Key": "Name", "Value": "web"}, {"Key": "Env", "Value": "prod"}]},
+            {"InstanceId": "i-bbb", "Tags": [{"Key": "Name", "Value": "api"}, {"Key": "Env", "Value": "staging"}]},
+        ]
+
+    def test_enabled_pivots_into_columns(self):
+        rows = self._make_tagged_rows()
+        blocks = render_table("Instances", rows, Heuristics(pivot_key_value=True))
+        text = "\n".join(blocks)
+        assert "Tags.Name" in text
+        assert "Tags.Env" in text
+        assert "web" in text
+        # No sub-table for Tags
+        assert "Instances.Tags" not in text
+
+    def test_disabled_extracts_as_subtable(self):
+        rows = self._make_tagged_rows()
+        blocks = render_table("Instances", rows, Heuristics(pivot_key_value=False))
+        text = "\n".join(blocks)
+        # Should have a sub-table for Tags
+        assert "Instances.Tags" in text
+        # Pivoted columns should NOT appear
+        assert "Tags.Name" not in text
+        assert "Tags.Env" not in text
+
+    def test_default_is_enabled(self):
+        h = Heuristics()
+        assert h.pivot_key_value is True
 
 
     def test_typo_raises_helpful_error(self):
