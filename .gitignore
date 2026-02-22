@@ -14,5 +14,7 @@ out
 /*.json
 research.md
 
-# Benchmark logs
+# Benchmark logs and generated results
 benchmarks/failures.jsonl
+benchmarks/results/raw_results.json
+benchmarks/results/context_sweep.json

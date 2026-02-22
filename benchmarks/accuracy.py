@@ -9,12 +9,16 @@ Requires a running Ollama server. Run with:
 import argparse
 import datetime
 import json
-import re
 import sys
 import time
 from pathlib import Path
 
 from mcp_condenser.condenser import Heuristics, condense_json, count_tokens
+
+from benchmarks.fixtures import (
+    QUESTIONS,
+    load_sample,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -49,295 +53,10 @@ def ask_ollama(model: str, context: str, question: str, host: str = "http://loca
     resp = httpx.post(
         f"{host}/api/chat",
         json=body,
-        timeout=300.0,
+        timeout=600.0,
     )
     resp.raise_for_status()
     return resp.json()["message"]["content"]
-
-
-# ---------------------------------------------------------------------------
-# Fixture loader
-# ---------------------------------------------------------------------------
-
-def load_sample(fixtures_dir: Path, filename: str):
-    """Load a fixture file, unwrapping {"result": "<json>"} envelope if present."""
-    raw = (fixtures_dir / filename).read_text()
-    data = json.loads(raw)
-    if isinstance(data, dict) and set(data.keys()) == {"result"} and isinstance(data["result"], str):
-        inner = data["result"]
-        data = json.loads(inner)
-        raw = inner
-    return raw, data
-
-
-# ---------------------------------------------------------------------------
-# Match functions
-# ---------------------------------------------------------------------------
-
-def contains(answer: str, expected: str) -> bool:
-    """Expected string appears somewhere in the LLM response."""
-    return expected in answer
-
-
-def numeric_close(answer: str, expected: str, tol: float = 0.01) -> bool:
-    """Extract a number from the answer and check it's within tolerance."""
-    expected_num = float(expected)
-    numbers = re.findall(r"[\d,]+\.?\d*", answer.replace(",", ""))
-    for raw_num in numbers:
-        try:
-            val = float(raw_num)
-            if abs(val - expected_num) <= tol * max(abs(expected_num), 1):
-                return True
-        except ValueError:
-            continue
-    return False
-
-
-def contains_or_numeric(answer: str, expected: str) -> bool:
-    return contains(answer, expected) or numeric_close(answer, expected)
-
-
-# ---------------------------------------------------------------------------
-# Questions per fixture
-# ---------------------------------------------------------------------------
-
-QUESTIONS: dict[str, list[tuple[str, str, callable]]] = {
-    "toolresult.json": [
-        # --- direct lookups ---
-        (
-            "What is the node's available filesystem space in bytes?",
-            "29417222144",
-            contains,
-        ),
-        (
-            "What is the node's filesystem capacity in bytes?",
-            "40571502592",
-            contains,
-        ),
-        (
-            "What is the 10-second average CPU PSI (some) value?",
-            "1.79",
-            contains_or_numeric,
-        ),
-        (
-            "What is the node's memory working set in bytes?",
-            "3740188672",
-            contains,
-        ),
-        (
-            "What is the node name?",
-            "talos-default-worker-1",
-            contains,
-        ),
-        (
-            "How many pods are listed in the pods array?",
-            "16",
-            contains_or_numeric,
-        ),
-        (
-            "What is the node's memory RSS bytes?",
-            "2135183360",
-            contains,
-        ),
-        (
-            "How many system containers are listed?",
-            "3",
-            contains_or_numeric,
-        ),
-        (
-            "What namespace is the jaeger pod running in?",
-            "ecommerce-prod",
-            contains,
-        ),
-        (
-            "What is the node's filesystem used bytes?",
-            "11154280448",
-            contains,
-        ),
-        # --- harder: cross-reference, comparison, aggregation ---
-        (
-            "Which pod has the highest CPU usage (usageNanoCores)? Give the pod name only.",
-            "cilium-8z7hq",
-            contains,
-        ),
-        (
-            "How many unique namespaces are pods running in?",
-            "8",
-            contains_or_numeric,
-        ),
-        (
-            "How many pods are in the kube-system namespace?",
-            "3",
-            contains_or_numeric,
-        ),
-        (
-            "Which pod has the highest memory RSS bytes? Give the pod name only.",
-            "kafka",
-            contains,
-        ),
-        (
-            "Which system container uses the most CPU (usageNanoCores)? Give the name only.",
-            "pods",
-            contains,
-        ),
-        # --- multi-hop, arithmetic, ranking ---
-        (
-            "What is the memory rssBytes of the pod with the highest CPU usageNanoCores? Give the number only.",
-            "136196096",
-            contains,
-        ),
-        (
-            "How many pods are NOT in the kube-system namespace?",
-            "13",
-            contains_or_numeric,
-        ),
-        (
-            "What is the name of the pod with the third highest memory workingSetBytes? Give the pod name only.",
-            "cilium",
-            contains,
-        ),
-        (
-            "What percentage of node filesystem capacity is used? Round to one decimal place.",
-            "27.5",
-            contains_or_numeric,
-        ),
-        (
-            "Which pod has the lowest CPU usageNanoCores? Give the pod name only.",
-            "kube-proxy",
-            contains,
-        ),
-    ],
-    "toolresult2_small.json": [
-        # --- direct lookups ---
-        (
-            "How many pods are listed in the pods array?",
-            "6",
-            contains_or_numeric,
-        ),
-        (
-            "Which pod has the highest memory working set bytes? Give the pod name only.",
-            "opensearch-0",
-            contains,
-        ),
-        (
-            "What is the node's filesystem capacity in bytes?",
-            "40571502592",
-            contains,
-        ),
-        (
-            "What is the memory working set bytes for the grafana pod?",
-            "404434944",
-            contains,
-        ),
-        (
-            "What is the 10-second average CPU PSI (some) value for the node?",
-            "6.24",
-            contains_or_numeric,
-        ),
-        (
-            "Which pod has the lowest memory working set bytes? Give the pod name only.",
-            "coredns",
-            contains,
-        ),
-        (
-            "What is the node name?",
-            "talos-default-worker-2",
-            contains,
-        ),
-        (
-            "What namespace is the basic-memory pod in?",
-            "aura",
-            contains,
-        ),
-        (
-            "How many containers does the grafana pod have?",
-            "4",
-            contains_or_numeric,
-        ),
-        (
-            "What is the IO PSI full avg10 value for the node?",
-            "0.44",
-            contains_or_numeric,
-        ),
-        (
-            "What is the opensearch pod's memory RSS bytes?",
-            "824295424",
-            contains,
-        ),
-        # --- harder: cross-reference, comparison, filtering ---
-        (
-            "Which pod has the highest CPU usage (usageNanoCores)? Give the pod name only.",
-            "grafana",
-            contains,
-        ),
-        (
-            "How many pods are in the ecommerce-prod namespace?",
-            "3",
-            contains_or_numeric,
-        ),
-        (
-            "Which pod has the second highest memory RSS bytes? Give the pod name only.",
-            "grafana",
-            contains,
-        ),
-        (
-            "How many unique namespaces are pods running in?",
-            "3",
-            contains_or_numeric,
-        ),
-        (
-            "Which pod has the most volumes? Give the pod name only.",
-            "grafana",
-            contains,
-        ),
-        (
-            "What is the name of the grafana container that uses the most memory (rssBytes)?",
-            "grafana",
-            contains,
-        ),
-        (
-            "What is the opensearch container's rootfs used bytes?",
-            "2640306176",
-            contains,
-        ),
-        # --- multi-hop, arithmetic, cross-section, ranking ---
-        (
-            "What is the memory rssBytes of the pod with the highest CPU usageNanoCores? Give the number only.",
-            "376483840",
-            contains,
-        ),
-        (
-            "How many containers does the pod with the highest memory workingSetBytes have?",
-            "1",
-            contains_or_numeric,
-        ),
-        (
-            "How many pods are NOT in the kube-system namespace?",
-            "4",
-            contains_or_numeric,
-        ),
-        (
-            "What is the name of the pod with the third highest memory workingSetBytes? Give the pod name only.",
-            "basic-memory",
-            contains,
-        ),
-        (
-            "What percentage of node filesystem capacity is used? Round to one decimal place.",
-            "44.7",
-            contains_or_numeric,
-        ),
-        (
-            "What is the constant ephemeral-storage availableBytes value shared by all pods?",
-            "22442622976",
-            contains,
-        ),
-        (
-            "How many total containers are there across all pods combined?",
-            "9",
-            contains_or_numeric,
-        ),
-    ],
-}
 
 
 # ---------------------------------------------------------------------------
@@ -365,24 +84,37 @@ def _status(icon: str, fmt: str, fixture: str, question: str, elapsed: float = 0
     print(f"  {icon} [{fmt:<4}] {fixture:<24} {q:<62} {elapsed:>5.1f}s", file=sys.stderr)
 
 
-def run_benchmark(args) -> list[dict]:
-    """Run all benchmark questions and return results."""
+def run_benchmark(args, questions: dict | None = None) -> list[dict]:
+    """Run all benchmark questions and return results.
+
+    Args:
+        args: Parsed CLI arguments (or equivalent namespace).
+        questions: Optional dict of fixture -> question list. Defaults to
+            the full QUESTIONS dict from fixtures.py.
+    """
+    if questions is None:
+        questions = QUESTIONS
     fixtures_dir = Path(args.fixtures_dir)
     results = []
 
-    total_q = sum(len(qs) for qs in QUESTIONS.values())
+    total_q = sum(len(qs) for qs in questions.values())
     formats = 1 if args.toon_only else 2
     total_calls = total_q * formats
     done = 0
 
     h = getattr(args, 'heuristics_obj', None)
-    for fixture, questions in QUESTIONS.items():
+    for fixture, qs in questions.items():
+        fixture_path = fixtures_dir / fixture
+        if not fixture_path.exists():
+            print(f"  (skipping {fixture} — file not found)", file=sys.stderr)
+            continue
+
         raw, data = load_sample(fixtures_dir, fixture)
         condensed = condense_json(data, heuristics=h)
 
-        print(f"\n  --- {fixture} ({len(questions)} questions) ---", file=sys.stderr)
+        print(f"\n  --- {fixture} ({len(qs)} questions) ---", file=sys.stderr)
 
-        for question, expected, match_fn in questions:
+        for question, expected, match_fn in qs:
             # JSON baseline (unless --toon-only)
             if not args.toon_only:
                 if not fits_context(raw, args.ctx):
@@ -399,23 +131,37 @@ def run_benchmark(args) -> list[dict]:
                     done += 1
                     _status("-", "json", fixture, question)
                 else:
-                    t0 = time.perf_counter()
-                    answer = ask_ollama(args.model, raw, question, host=args.host, num_ctx=args.num_ctx)
-                    elapsed = time.perf_counter() - t0
-                    passed = match_fn(answer, expected)
-                    results.append({
-                        "fixture": fixture,
-                        "question": question[:50],
-                        "format": "json",
-                        "tokens": count_tokens(raw),
-                        "elapsed": elapsed,
-                        "passed": passed,
-                        "answer": answer.strip(),
-                        "expected": expected,
-                    })
-                    done += 1
-                    icon = "+" if passed else "x"
-                    _status(icon, "json", fixture, question, elapsed)
+                    try:
+                        t0 = time.perf_counter()
+                        answer = ask_ollama(args.model, raw, question, host=args.host, num_ctx=args.num_ctx)
+                        elapsed = time.perf_counter() - t0
+                        passed = match_fn(answer, expected)
+                        results.append({
+                            "fixture": fixture,
+                            "question": question[:50],
+                            "format": "json",
+                            "tokens": count_tokens(raw),
+                            "elapsed": elapsed,
+                            "passed": passed,
+                            "answer": answer.strip(),
+                            "expected": expected,
+                        })
+                        done += 1
+                        icon = "+" if passed else "x"
+                        _status(icon, "json", fixture, question, elapsed)
+                    except Exception as e:
+                        results.append({
+                            "fixture": fixture,
+                            "question": question[:50],
+                            "format": "json",
+                            "tokens": count_tokens(raw),
+                            "elapsed": 0,
+                            "passed": None,
+                            "answer": f"(error: {e})",
+                            "expected": expected,
+                        })
+                        done += 1
+                        _status("!", "json", fixture, question)
 
             # Condensed TOON
             if not fits_context(condensed, args.ctx):
@@ -432,23 +178,37 @@ def run_benchmark(args) -> list[dict]:
                 done += 1
                 _status("-", "toon", fixture, question)
             else:
-                t0 = time.perf_counter()
-                answer = ask_ollama(args.model, condensed, question, host=args.host, num_ctx=args.num_ctx)
-                elapsed = time.perf_counter() - t0
-                passed = match_fn(answer, expected)
-                results.append({
-                    "fixture": fixture,
-                    "question": question[:50],
-                    "format": "toon",
-                    "tokens": count_tokens(condensed),
-                    "elapsed": elapsed,
-                    "passed": passed,
-                    "answer": answer.strip(),
-                    "expected": expected,
-                })
-                done += 1
-                icon = "+" if passed else "x"
-                _status(icon, "toon", fixture, question, elapsed)
+                try:
+                    t0 = time.perf_counter()
+                    answer = ask_ollama(args.model, condensed, question, host=args.host, num_ctx=args.num_ctx)
+                    elapsed = time.perf_counter() - t0
+                    passed = match_fn(answer, expected)
+                    results.append({
+                        "fixture": fixture,
+                        "question": question[:50],
+                        "format": "toon",
+                        "tokens": count_tokens(condensed),
+                        "elapsed": elapsed,
+                        "passed": passed,
+                        "answer": answer.strip(),
+                        "expected": expected,
+                    })
+                    done += 1
+                    icon = "+" if passed else "x"
+                    _status(icon, "toon", fixture, question, elapsed)
+                except Exception as e:
+                    results.append({
+                        "fixture": fixture,
+                        "question": question[:50],
+                        "format": "toon",
+                        "tokens": count_tokens(condensed),
+                        "elapsed": 0,
+                        "passed": None,
+                        "answer": f"(error: {e})",
+                        "expected": expected,
+                    })
+                    done += 1
+                    _status("!", "toon", fixture, question)
 
         print(f"  ({done}/{total_calls} complete)", file=sys.stderr)
 
@@ -471,10 +231,11 @@ def print_summary(results: list[dict], fixtures_dir: Path, heuristics: Heuristic
         print(f"  Heuristics: {heuristic_overrides}")
 
     # Per-fixture token comparison
+    fixtures_seen = sorted(set(r["fixture"] for r in results))
     print()
     print(f"  {'Fixture':<28} {'JSON tokens':>12} {'TOON tokens':>12} {'Reduction':>10}")
     print(f"  {'-'*28} {'-'*12} {'-'*12} {'-'*10}")
-    for fixture in QUESTIONS:
+    for fixture in fixtures_seen:
         raw, data = load_sample(fixtures_dir, fixture)
         condensed = condense_json(data, heuristics=heuristics)
         rt = count_tokens(raw)
