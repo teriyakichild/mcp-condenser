@@ -6,10 +6,11 @@
 [![GitHub Release](https://img.shields.io/github/v/release/teriyakichild/mcp-condenser)](https://github.com/teriyakichild/mcp-condenser/releases)
 [![Docker](https://img.shields.io/docker/v/teriyakichild/mcp-condenser?label=docker)](https://hub.docker.com/r/teriyakichild/mcp-condenser)
 
-MCP proxy that condenses verbose JSON and YAML tool responses into compact
-[TOON](https://github.com/toon-format/spec) text, dramatically reducing token
-usage for API outputs that return many records with the same nested schema —
-pod listings, node status tables, cloud resource inventories, and similar.
+MCP proxy that condenses verbose JSON, YAML, XML, and CSV tool responses into
+compact [TOON](https://github.com/toon-format/spec) text, dramatically reducing
+token usage for API outputs that return many records with the same nested
+schema — pod listings, node status tables, cloud resource inventories, and
+similar.
 
 ## How it works
 
@@ -101,11 +102,13 @@ Quick links:
 
 ## CLI usage
 
-Condense a JSON or YAML file directly:
+Condense a JSON, YAML, XML, or CSV file directly:
 
 ```bash
 uv run mcp-condenser input.json
 uv run mcp-condenser input.yaml
+uv run mcp-condenser deployments.xml
+uv run mcp-condenser metrics.csv
 cat pods.yaml | uv run mcp-condenser
 ```
 
@@ -123,10 +126,21 @@ Measured across Kubernetes, AWS, and database fixtures using
 | K8s 30-pod node | Kubernetes | 69,885 | 22,229 | **68.2%** |
 | EC2 instances | AWS | 33,498 | 4,386 | **86.9%** |
 | SQL orders | Database | 26,165 | 11,298 | **56.8%** |
+| Deploy inventory | DevOps (XML) | 1,928 | 664 | **65.6%** |
+| Server metrics | Infra (CSV) | 959 | 994 | -3.6% |
 
 Compression is domain-agnostic: Kubernetes pod listings, AWS EC2
-describe-instances responses, and SQL result sets all benefit, with reductions
-ranging from 57% to 87%.
+describe-instances responses, SQL result sets, and XML API responses all
+benefit, with reductions ranging from 57% to 87%.
+
+> **Note on CSV:** CSV is already a tabular format, so TOON condensation adds
+> minimal overhead rather than saving tokens. The value of CSV support is
+> *parsing and type inference* — the condenser auto-detects CSV/TSV input,
+> converts strings to native types (int, float, null), and feeds the result
+> through the same heuristic pipeline. This means CSV responses still benefit
+> from column elision (zero-only, null-only, constant columns) when those
+> patterns are present. For maximum savings, prefer `format_hint: "json"` or
+> `"xml"` on tools whose upstream supports multiple output formats.
 
 ### LLM accuracy
 
@@ -141,9 +155,9 @@ uv run python benchmarks/accuracy.py --model qwen3:4b --host http://localhost:11
 uv run python benchmarks/matrix.py --host http://localhost:11434
 ```
 
-The benchmark suite tests 90 questions across 5 fixtures (Kubernetes, AWS EC2,
-SQL) covering direct lookups, cross-reference queries, aggregations, and
-multi-hop reasoning.
+The benchmark suite tests 120 questions across 7 fixtures (Kubernetes, AWS EC2,
+SQL, CSV, XML) covering direct lookups, cross-reference queries, aggregations,
+and multi-hop reasoning.
 
 ### Local models: context window enablement
 
