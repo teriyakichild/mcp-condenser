@@ -1,6 +1,107 @@
 # CHANGELOG
 
 
+## v0.8.0 (2026-02-23)
+
+### Bug Fixes
+
+- Install project at build time instead of runtime
+  ([`4850036`](https://github.com/teriyakichild/mcp-condenser/commit/4850036d7da5ce8114cf27984cb0f7a1c48e3ef1))
+
+Add a second `uv sync --frozen` after copying source to install the project package during the
+  Docker build. Replace `uv run` entrypoint with direct .venv/bin invocation so nothing is resolved
+  at container start.
+
+- Remove stale QUESTIONS and match functions from accuracy.py
+  ([`435e9fe`](https://github.com/teriyakichild/mcp-condenser/commit/435e9fe872b5d969f52e073f57dd3d84b4e2d22e))
+
+The local QUESTIONS dict shadowed the import from fixtures.py, limiting standalone accuracy.py to
+  only 2 fixtures instead of all 8. The local match functions also referenced `re` without importing
+  it.
+
+- Split accuracy into separate JSON/TOON tables, remove raw backup
+  ([`dbe7119`](https://github.com/teriyakichild/mcp-condenser/commit/dbe7119203125e283283304a02475c2f63df1da6))
+
+Split the combined accuracy matrix into separate JSON (baseline) and TOON (balanced profile) tables
+  for readability. Remove raw_results_pre_profiles.json from repo.
+
+### Documentation
+
+- Add CSV/XML to README, note on CSV token behavior
+  ([`b1305fe`](https://github.com/teriyakichild/mcp-condenser/commit/b1305fe23340f007a81e4009ea31b304ea623f98))
+
+Update supported formats, CLI examples, benchmark table, and question count. Add note explaining
+  that CSV already being tabular means TOON adds minimal overhead — the value is auto-detection,
+  type inference, and heuristic column elision rather than token reduction.
+
+- Rename JSON to Raw in README benchmark tables
+  ([`4d4aaa6`](https://github.com/teriyakichild/mcp-condenser/commit/4d4aaa6dfa335581705f928e9df7edec331169cd))
+
+### Features
+
+- Add app_performance.csv benchmark fixture
+  ([`ff03d7d`](https://github.com/teriyakichild/mcp-condenser/commit/ff03d7df752c8e2dad9cffff444bb47e18527750))
+
+30 microservices x 25 columns APM dashboard export designed to exercise TOON heuristics: 4 all-zero
+  cols, 3 all-null cols, 1 constant col elided; latency and errors tuple-grouped (25→13 effective
+  columns). 15 accuracy questions including annotation-reading tests. qwen3:4b scores 93% TOON vs
+  87% raw at 1.6x speed.
+
+- Add CSV and XML benchmark fixtures with accuracy questions
+  ([`de3770a`](https://github.com/teriyakichild/mcp-condenser/commit/de3770a6d470f8abf17fe68134d69b854c4dee67))
+
+Add server_metrics.csv (25 servers x 10 columns) and deploy_inventory.xml (20 deployments across 3
+  environments) as accuracy benchmark fixtures. Update load_sample to handle non-JSON formats via
+  parse_input, add 15 questions each covering direct lookups, filtering, cross-reference, and
+  multi-hop queries.
+
+XML fixture shows 65.6% token reduction from eliminating duplicated tags — exactly the enterprise
+  API use case the condenser targets.
+
+- Add CSV/TSV parser with type inference
+  ([`a35492c`](https://github.com/teriyakichild/mcp-condenser/commit/a35492c8d9e1c3d8df476fa91c545c443a79f9c1))
+
+Register a new CSV parser after JSON/YAML in the parser registry. Uses csv.Sniffer for dialect
+  detection (comma, tab, pipe, semicolon), requires 2+ columns and at least one data row. Type
+  normalization converts numeric strings to int/float and empty values to None.
+
+- Add format_hint config for per-tool format override
+  ([`1d8dea4`](https://github.com/teriyakichild/mcp-condenser/commit/1d8dea4c413406f159a2b37cab13ad44d3e4ef1e))
+
+ServerConfig gains format_hint and tool_format_hints fields, parsed from FORMAT_HINT /
+  TOOL_FORMAT_HINTS env vars and JSON config. The proxy passes the resolved hint through to
+  parse_input().
+
+- Add XML parser with tree-to-dict conversion
+  ([`17ca4db`](https://github.com/teriyakichild/mcp-condenser/commit/17ca4dbe21c3f8dcfd6e248f314634ccfada1b89))
+
+Uses xml.etree.ElementTree to parse XML into nested dicts/lists that the existing condense pipeline
+  handles natively. Attributes become @attr keys, repeated child elements become lists, and text
+  values get int/float/bool coercion. Registered after CSV (lowest auto-detect priority).
+
+### Refactoring
+
+- Extract parser registry into parsers.py
+  ([`8ba88e5`](https://github.com/teriyakichild/mcp-condenser/commit/8ba88e5b1b778f5cd92ac84a4756cb5c7bda8d8e))
+
+Move parse_input() from condenser.py into a new parsers module with an extensible registry (Parser
+  NamedTuple, PARSER_REGISTRY, register_parser). Existing importers continue to work via re-export
+  from condenser.py.
+
+- Rename benchmark format label from json to raw
+  ([`ad6057f`](https://github.com/teriyakichild/mcp-condenser/commit/ad6057f038c61e2552a200446abe08a979a80518))
+
+The baseline format is the original input (JSON, CSV, XML, etc.), not always JSON. Rename format
+  field, display labels, variable names, and help text throughout accuracy.py and matrix.py. Also
+  add app_performance.csv to matrix DEFAULT_FIXTURES.
+
+- Rename condense_json/toon_encode_json to format-agnostic names
+  ([`7d24b54`](https://github.com/teriyakichild/mcp-condenser/commit/7d24b54b50944478ccba71a4ccd30ed4342520e3))
+
+condense_json() → condense_text(), toon_encode_json() → toon_encode(). Old names remain as
+  deprecated aliases that emit DeprecationWarning. All internal callers updated to use new names.
+
+
 ## v0.7.0 (2026-02-23)
 
 ### Bug Fixes
