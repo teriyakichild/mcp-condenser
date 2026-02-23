@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
-from mcp_condenser.condenser import condense_json, count_tokens
+from mcp_condenser.condenser import Heuristics, PROFILES, condense_json, count_tokens, resolve_profile
 
 from benchmarks.accuracy import ask_ollama, fits_context, run_benchmark
 from benchmarks.fixtures import FIXTURE_METADATA, QUESTIONS, load_sample
@@ -63,7 +63,7 @@ def _pct(passed: int, total: int) -> str:
 # Token reduction table
 # ---------------------------------------------------------------------------
 
-def generate_token_table(fixtures_dir: Path, fixtures: list[str]) -> str:
+def generate_token_table(fixtures_dir: Path, fixtures: list[str], heuristics: Heuristics | None = None) -> str:
     """Generate markdown table showing token reduction per fixture."""
     lines = [
         "| Fixture | Domain | JSON tokens | TOON tokens | Reduction |",
@@ -74,7 +74,7 @@ def generate_token_table(fixtures_dir: Path, fixtures: list[str]) -> str:
         if not path.exists():
             continue
         raw, data = load_sample(fixtures_dir, fixture)
-        condensed = condense_json(data)
+        condensed = condense_json(data, heuristics=heuristics)
         rt = count_tokens(raw)
         ct = count_tokens(condensed)
         pct = (1 - ct / rt) * 100
@@ -124,6 +124,28 @@ def generate_accuracy_tables(
     return json_md, toon_md
 
 
+def generate_combined_accuracy_table(
+    all_results: dict[str, list[dict]],
+    fixtures: list[str],
+) -> str:
+    """Generate a combined accuracy table with 'JSON / TOON' per cell."""
+    fixture_labels = [FIXTURE_METADATA.get(f, {}).get("label", f) for f in fixtures]
+
+    header = "| Model | " + " | ".join(fixture_labels) + " |"
+    sep = "|-------|" + "|".join(["-----" for _ in fixtures]) + "|"
+    lines = [header, sep]
+
+    for model, results in all_results.items():
+        cells = [f"**{model}**"]
+        for fixture in fixtures:
+            jp, jt = _score(results, fixture, "json")
+            tp, tt = _score(results, fixture, "toon")
+            cells.append(f"{_pct(jp, jt)} / {_pct(tp, tt)}")
+        lines.append("| " + " | ".join(cells) + " |")
+
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # Context window enablement table
 # ---------------------------------------------------------------------------
@@ -132,6 +154,7 @@ def generate_context_table(
     sweep_results: dict[int, list[dict]],
     fixtures: list[str],
     fixtures_dir: Path,
+    heuristics: Heuristics | None = None,
 ) -> str:
     """Generate context window enablement table.
 
@@ -145,7 +168,7 @@ def generate_context_table(
         if not path.exists():
             continue
         raw, data = load_sample(fixtures_dir, fixture)
-        condensed = condense_json(data)
+        condensed = condense_json(data, heuristics=heuristics)
         fixture_tokens[fixture] = (count_tokens(raw), count_tokens(condensed))
 
     fixture_labels = [FIXTURE_METADATA.get(f, {}).get("label", f) for f in fixtures]
@@ -225,6 +248,8 @@ def run_matrix(
     fixtures: list[str],
     output_dir: Path,
     resume: bool = False,
+    toon_only: bool = False,
+    heuristics: Heuristics | None = None,
 ) -> dict[str, list[dict]]:
     """Run benchmark across all models, saving results incrementally."""
     all_results: dict[str, list[dict]] = {}
@@ -255,8 +280,8 @@ def run_matrix(
             fixtures_dir=str(fixtures_dir),
             ctx=128000,
             num_ctx=0,
-            toon_only=False,
-            heuristics_obj=None,
+            toon_only=toon_only,
+            heuristics_obj=heuristics,
         )
 
         try:
@@ -284,15 +309,16 @@ def write_reports(
     fixtures_dir: Path,
     output_dir: Path,
     sweep_results: dict[int, list[dict]] | None = None,
+    heuristics: Heuristics | None = None,
 ):
     """Write all markdown report files."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Token reduction table
-    token_md = generate_token_table(fixtures_dir, fixtures)
+    token_md = generate_token_table(fixtures_dir, fixtures, heuristics=heuristics)
 
-    # Accuracy tables (separate JSON and TOON)
-    json_md, toon_md = generate_accuracy_tables(all_results, fixtures)
+    # Combined accuracy table (JSON / TOON per cell)
+    combined_md = generate_combined_accuracy_table(all_results, fixtures)
 
     # Context enablement
     all_fixtures = fixtures + LARGE_FIXTURES
@@ -300,6 +326,7 @@ def write_reports(
         sweep_results or {},
         all_fixtures,
         fixtures_dir,
+        heuristics=heuristics,
     )
 
     # Combined report
@@ -310,18 +337,15 @@ def write_reports(
         "",
         token_md,
         "",
-        "## JSON Accuracy",
+        "## Accuracy Matrix",
         "",
-        json_md,
+        "*JSON accuracy / TOON accuracy per model and fixture.*",
         "",
-        "## TOON Accuracy",
+        combined_md,
         "",
-        toon_md,
+        "*Cells show JSON accuracy / TOON accuracy.*",
         "",
-        "## Local Models: Context Window Enablement",
-        "",
-        "Small context windows (8K–64K) common with local models can't fit large",
-        "API responses as raw JSON. TOON condensing brings them within reach.",
+        "## Context Window Enablement",
         "",
         context_md,
         "",
@@ -389,6 +413,16 @@ def main():
         default="llama3.1:8b",
         help="Model for context sweep (default: llama3.1:8b)",
     )
+    parser.add_argument(
+        "--profile",
+        default="balanced",
+        help="Heuristics profile: balanced (default), compact, precise",
+    )
+    parser.add_argument(
+        "--toon-only",
+        action="store_true",
+        help="Skip JSON baseline (halves runtime)",
+    )
 
     args = parser.parse_args()
 
@@ -414,6 +448,12 @@ def main():
         print("  Error: no valid fixtures found", file=sys.stderr)
         sys.exit(1)
 
+    # Resolve profile heuristics
+    profile_heuristics = resolve_profile(args.profile)
+    print(f"\n  Profile: {args.profile}", file=sys.stderr)
+    if args.toon_only:
+        print(f"  Mode: TOON-only (skipping JSON baseline)", file=sys.stderr)
+
     t0 = time.perf_counter()
 
     if args.context_sweep:
@@ -429,13 +469,21 @@ def main():
         serializable = {str(k): v for k, v in sweep_results.items()}
         sweep_path.write_text(json.dumps(serializable, indent=2))
 
-        write_reports({args.model: []}, fixtures, fixtures_dir, output_dir, sweep_results)
+        write_reports(
+            {args.model: []}, fixtures, fixtures_dir, output_dir,
+            sweep_results, heuristics=profile_heuristics,
+        )
     else:
         # Model matrix mode
         all_results = run_matrix(
-            models, args.host, fixtures_dir, fixtures, output_dir, args.resume,
+            models, args.host, fixtures_dir, fixtures, output_dir,
+            resume=args.resume, toon_only=args.toon_only,
+            heuristics=profile_heuristics,
         )
-        write_reports(all_results, fixtures, fixtures_dir, output_dir)
+        write_reports(
+            all_results, fixtures, fixtures_dir, output_dir,
+            heuristics=profile_heuristics,
+        )
 
     elapsed = time.perf_counter() - t0
     print(f"\n  Total time: {elapsed/60:.1f} minutes", file=sys.stderr)
