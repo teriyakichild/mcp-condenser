@@ -89,19 +89,13 @@ def generate_token_table(fixtures_dir: Path, fixtures: list[str]) -> str:
 # Accuracy matrix table
 # ---------------------------------------------------------------------------
 
-def generate_accuracy_matrix(
+def _accuracy_table(
     all_results: dict[str, list[dict]],
     fixtures: list[str],
+    fmt: str,
 ) -> str:
-    """Generate model × fixture accuracy matrix as markdown.
-
-    all_results: {model_name: [result_dicts]}
-    """
-    # Header
-    fixture_labels = []
-    for f in fixtures:
-        meta = FIXTURE_METADATA.get(f, {})
-        fixture_labels.append(meta.get("label", f))
+    """Generate a single accuracy table for one format (json or toon)."""
+    fixture_labels = [FIXTURE_METADATA.get(f, {}).get("label", f) for f in fixtures]
 
     header = "| Model | " + " | ".join(fixture_labels) + " |"
     sep = "|-------|" + "|".join(["-----" for _ in fixtures]) + "|"
@@ -110,19 +104,24 @@ def generate_accuracy_matrix(
     for model, results in all_results.items():
         cells = [f"**{model}**"]
         for fixture in fixtures:
-            jp, jt = _score(results, fixture, "json")
-            tp, tt = _score(results, fixture, "toon")
-            json_s = _pct(jp, jt)
-            toon_s = _pct(tp, tt)
-            if jt == 0:
-                cells.append(f"-- / {toon_s}")
-            else:
-                cells.append(f"{json_s} / {toon_s}")
+            passed, total = _score(results, fixture, fmt)
+            cells.append(_pct(passed, total))
         lines.append("| " + " | ".join(cells) + " |")
 
-    lines.append("")
-    lines.append("*Cells show JSON accuracy / TOON accuracy.*")
     return "\n".join(lines)
+
+
+def generate_accuracy_tables(
+    all_results: dict[str, list[dict]],
+    fixtures: list[str],
+) -> tuple[str, str]:
+    """Generate separate JSON and TOON accuracy tables.
+
+    Returns (json_table_md, toon_table_md).
+    """
+    json_md = _accuracy_table(all_results, fixtures, "json")
+    toon_md = _accuracy_table(all_results, fixtures, "toon")
+    return json_md, toon_md
 
 
 # ---------------------------------------------------------------------------
@@ -166,11 +165,11 @@ def generate_context_table(
             json_fits = fits_context_static(jt, ctx)
             toon_fits = fits_context_static(tt, ctx)
             if json_fits and toon_fits:
-                cells.append("Both")
+                cells.append("JSON + TOON")
             elif toon_fits:
                 cells.append("**TOON only**")
             else:
-                cells.append("--")
+                cells.append("Neither")
         lines.append("| " + " | ".join(cells) + " |")
 
     return "\n".join(lines)
@@ -292,8 +291,8 @@ def write_reports(
     # Token reduction table
     token_md = generate_token_table(fixtures_dir, fixtures)
 
-    # Accuracy matrix
-    matrix_md = generate_accuracy_matrix(all_results, fixtures)
+    # Accuracy tables (separate JSON and TOON)
+    json_md, toon_md = generate_accuracy_tables(all_results, fixtures)
 
     # Context enablement
     all_fixtures = fixtures + LARGE_FIXTURES
@@ -311,13 +310,18 @@ def write_reports(
         "",
         token_md,
         "",
-        "## Accuracy Matrix",
+        "## JSON Accuracy",
         "",
-        "*JSON accuracy / TOON accuracy per model and fixture.*",
+        json_md,
         "",
-        matrix_md,
+        "## TOON Accuracy",
         "",
-        "## Context Window Enablement",
+        toon_md,
+        "",
+        "## Local Models: Context Window Enablement",
+        "",
+        "Small context windows (8K–64K) common with local models can't fit large",
+        "API responses as raw JSON. TOON condensing brings them within reach.",
         "",
         context_md,
         "",

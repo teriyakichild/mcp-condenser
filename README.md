@@ -122,23 +122,6 @@ Compression is domain-agnostic: Kubernetes pod listings, AWS EC2
 describe-instances responses, and SQL result sets all benefit, with reductions
 ranging from 57% to 87%.
 
-### Context window enablement
-
-TOON condensing doesn't just save tokens — it makes analysis *possible* where
-raw JSON would overflow the model's context window.
-
-| Fixture | JSON tok | TOON tok | 8K | 16K | 32K | 64K | 128K |
-|---------|----------|----------|-----|-----|-----|-----|-----|
-| K8s 16-pod node | 9,876 | 3,656 | -- | **TOON only** | Both | Both | Both |
-| K8s 6-pod node | 15,285 | 5,919 | -- | -- | **TOON only** | Both | Both |
-| EC2 instances | 33,498 | 4,386 | -- | **TOON only** | **TOON only** | **TOON only** | Both |
-| SQL orders | 26,165 | 11,298 | -- | -- | -- | **TOON only** | Both |
-| K8s 30-pod node | 69,885 | 22,229 | -- | -- | -- | -- | **TOON only** |
-
-**TOON only** = raw JSON exceeds context but condensed TOON fits.
-The 30-pod K8s fixture (70K JSON tokens) is only analyzable via TOON, even at
-128K context.
-
 ### LLM accuracy
 
 Run the accuracy benchmark against a local Ollama instance to verify TOON
@@ -150,14 +133,26 @@ uv run python benchmarks/accuracy.py --model qwen3:4b --host http://localhost:11
 
 # Multi-model matrix (generates markdown tables)
 uv run python benchmarks/matrix.py --host http://localhost:11434
-
-# Context window sweep
-uv run python benchmarks/matrix.py --context-sweep --model llama3.1:8b --host http://localhost:11434
 ```
 
 The benchmark suite tests 90 questions across 5 fixtures (Kubernetes, AWS EC2,
 SQL) covering direct lookups, cross-reference queries, aggregations, and
-multi-hop reasoning. Run the token reduction tests (no Ollama required):
+multi-hop reasoning.
+
+### Local models: context window enablement
+
+Small context windows (8K-64K) common with local models can't fit large API
+responses as raw JSON. TOON condensing brings them within reach.
+
+| Fixture | JSON tok | TOON tok | 8K | 16K | 32K | 64K | 128K |
+|---------|----------|----------|-----|-----|-----|-----|------|
+| K8s 16-pod node | 9,876 | 3,656 | Neither | **TOON only** | JSON + TOON | JSON + TOON | JSON + TOON |
+| K8s 6-pod node | 15,285 | 5,919 | Neither | Neither | **TOON only** | JSON + TOON | JSON + TOON |
+| EC2 instances | 33,498 | 4,386 | Neither | **TOON only** | **TOON only** | **TOON only** | JSON + TOON |
+| SQL orders | 26,165 | 11,298 | Neither | Neither | Neither | **TOON only** | JSON + TOON |
+| K8s 30-pod node | 69,885 | 22,229 | Neither | Neither | Neither | Neither | **TOON only** |
+
+Run the token reduction tests (no Ollama required):
 
 ```bash
 uv run pytest tests/test_benchmark.py -v -s
