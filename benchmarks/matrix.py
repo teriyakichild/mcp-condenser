@@ -317,8 +317,8 @@ def write_reports(
     # Token reduction table
     token_md = generate_token_table(fixtures_dir, fixtures, heuristics=heuristics)
 
-    # Combined accuracy table (JSON / TOON per cell)
-    combined_md = generate_combined_accuracy_table(all_results, fixtures)
+    # Separate accuracy tables
+    json_md, toon_md = generate_accuracy_tables(all_results, fixtures)
 
     # Context enablement
     all_fixtures = fixtures + LARGE_FIXTURES
@@ -337,13 +337,13 @@ def write_reports(
         "",
         token_md,
         "",
-        "## Accuracy Matrix",
+        "## JSON Accuracy (baseline)",
         "",
-        "*JSON accuracy / TOON accuracy per model and fixture.*",
+        json_md,
         "",
-        combined_md,
+        "## TOON Accuracy (balanced profile)",
         "",
-        "*Cells show JSON accuracy / TOON accuracy.*",
+        toon_md,
         "",
         "## Context Window Enablement",
         "",
