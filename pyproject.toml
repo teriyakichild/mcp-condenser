@@ -25,8 +25,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/logdna/mcp-condenser"
-Repository = "https://github.com/logdna/mcp-condenser"
+Homepage = "https://github.com/teriyakichild/mcp-condenser"
+Repository = "https://github.com/teriyakichild/mcp-condenser"
 
 [project.scripts]
 mcp-condenser = "mcp_condenser.condenser:main"

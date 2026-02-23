@@ -1,9 +1,9 @@
 # mcp-condenser
 
-[![CI](https://github.com/logdna/mcp-condenser/actions/workflows/ci.yml/badge.svg)](https://github.com/logdna/mcp-condenser/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/logdna/mcp-condenser)](LICENSE)
+[![CI](https://github.com/teriyakichild/mcp-condenser/actions/workflows/ci.yml/badge.svg)](https://github.com/teriyakichild/mcp-condenser/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/teriyakichild/mcp-condenser)](LICENSE)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org)
-[![GitHub Release](https://img.shields.io/github/v/release/logdna/mcp-condenser)](https://github.com/logdna/mcp-condenser/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/teriyakichild/mcp-condenser)](https://github.com/teriyakichild/mcp-condenser/releases)
 [![Docker](https://img.shields.io/docker/v/teriyakichild/mcp-condenser?label=docker)](https://hub.docker.com/r/teriyakichild/mcp-condenser)
 
 MCP proxy that condenses verbose JSON and YAML tool responses into compact
