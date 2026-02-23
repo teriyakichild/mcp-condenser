@@ -255,6 +255,39 @@ class TestCondenseCsv:
         assert "100" in result
 
 
+class TestCondenseXml:
+    """Integration: XML text → parse_input → condense_text → TOON output."""
+
+    def test_xml_repeated_children_to_toon_table(self):
+        xml_text = (
+            "<users>"
+            "<user><name>alice</name><age>30</age><city>nyc</city></user>"
+            "<user><name>bob</name><age>25</age><city>sf</city></user>"
+            "<user><name>carol</name><age>40</age><city>la</city></user>"
+            "</users>"
+        )
+        data, fmt = parse_input(xml_text)
+        assert fmt == "xml"
+        result = condense_text(data)
+        assert "3 rows" in result
+        assert "alice" in result
+        assert "bob" in result
+        assert "carol" in result
+
+    def test_xml_nested_structure(self):
+        xml_text = (
+            "<server>"
+            "<host>10.0.0.1</host>"
+            "<ports><http>80</http><https>443</https></ports>"
+            "</server>"
+        )
+        data, _ = parse_input(xml_text)
+        result = condense_text(data)
+        assert "10.0.0.1" in result
+        assert "80" in result
+        assert "443" in result
+
+
 class TestTruncateToTokenLimit:
     def test_no_op_when_under_limit(self):
         """Text within the token limit is returned unchanged."""

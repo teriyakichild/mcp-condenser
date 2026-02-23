@@ -200,3 +200,112 @@ class TestCsvParser:
         names = [p.name for p in PARSER_REGISTRY]
         assert names.index("csv") > names.index("json")
         assert names.index("csv") > names.index("yaml")
+
+
+class TestXmlParser:
+    """Tests for the XML parser."""
+
+    def test_basic_element(self):
+        text = "<root><name>alice</name><age>30</age></root>"
+        data, fmt = parse_input(text)
+        assert fmt == "xml"
+        assert data["name"] == "alice"
+        assert data["age"] == 30
+
+    def test_attributes(self):
+        text = '<server host="10.0.0.1" port="8080"/>'
+        data, fmt = parse_input(text)
+        assert fmt == "xml"
+        assert data["@host"] == "10.0.0.1"
+        assert data["@port"] == 8080
+
+    def test_nested_elements(self):
+        text = "<root><meta><name>test</name><version>2</version></meta></root>"
+        data, fmt = parse_input(text)
+        assert fmt == "xml"
+        assert data["meta"]["name"] == "test"
+        assert data["meta"]["version"] == 2
+
+    def test_repeated_children_become_list(self):
+        text = (
+            "<users>"
+            "<user><name>alice</name><age>30</age></user>"
+            "<user><name>bob</name><age>25</age></user>"
+            "<user><name>carol</name><age>40</age></user>"
+            "</users>"
+        )
+        data, fmt = parse_input(text)
+        assert fmt == "xml"
+        assert isinstance(data["user"], list)
+        assert len(data["user"]) == 3
+        assert data["user"][0]["name"] == "alice"
+        assert data["user"][2]["age"] == 40
+
+    def test_attributes_and_children(self):
+        text = '<item id="42"><name>widget</name><price>9.99</price></item>'
+        data, fmt = parse_input(text)
+        assert fmt == "xml"
+        assert data["@id"] == 42
+        assert data["name"] == "widget"
+        assert data["price"] == 9.99
+
+    def test_type_coercion(self):
+        text = "<data><count>100</count><rate>3.14</rate><active>true</active><empty></empty></data>"
+        data, fmt = parse_input(text)
+        assert fmt == "xml"
+        assert data["count"] == 100
+        assert isinstance(data["count"], int)
+        assert data["rate"] == 3.14
+        assert isinstance(data["rate"], float)
+        assert data["active"] is True
+        assert data["empty"] == {}
+
+    def test_non_xml_rejected(self):
+        """Non-XML text should not match."""
+        with pytest.raises(ValueError):
+            parse_input("this is not xml")
+
+    def test_json_preferred_over_xml(self):
+        text = '{"name": "alice"}'
+        _, fmt = parse_input(text)
+        assert fmt == "json"
+
+    def test_format_hint_xml(self):
+        text = "<root><a>1</a><b>2</b></root>"
+        data, fmt = parse_input(text, format_hint="xml")
+        assert fmt == "xml"
+        assert data["a"] == 1
+
+    def test_registry_order(self):
+        names = [p.name for p in PARSER_REGISTRY]
+        assert names.index("xml") > names.index("json")
+        assert names.index("xml") > names.index("yaml")
+        assert names.index("xml") > names.index("csv")
+
+    def test_mixed_text_and_children(self):
+        """Element with both text and child elements."""
+        text = "<note>Hello <em>world</em></note>"
+        data, fmt = parse_input(text)
+        assert fmt == "xml"
+        assert data["#text"] == "Hello"
+        assert data["em"] == "world"
+
+    def test_soap_style_response(self):
+        """Enterprise-style XML with namespaces stripped by ET."""
+        text = (
+            "<response>"
+            "<status>200</status>"
+            "<results>"
+            "<item><id>1</id><value>foo</value></item>"
+            "<item><id>2</id><value>bar</value></item>"
+            "</results>"
+            "</response>"
+        )
+        data, fmt = parse_input(text)
+        assert fmt == "xml"
+        assert data["status"] == 200
+        items = data["results"]["item"]
+        assert isinstance(items, list)
+        assert len(items) == 2
+        assert items[0]["id"] == 1
+        assert items[1]["value"] == "bar"

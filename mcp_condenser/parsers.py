@@ -7,6 +7,8 @@ can be registered via ``register_parser()``.
 import csv
 import io
 import json
+import xml.etree.ElementTree as ET
+from collections import Counter
 from typing import Any, Callable, NamedTuple
 
 import yaml
@@ -97,12 +99,84 @@ def _normalize_csv(data: list[dict[str, str]]) -> list[dict[str, Any]]:
     return out
 
 
+def _xml_elem_to_dict(elem: ET.Element) -> dict[str, Any]:
+    """Convert an XML element to a nested dict.
+
+    Rules:
+    - Attributes become ``@attr`` keys.
+    - Repeated child tags are grouped into a list.
+    - A leaf element with only text becomes a plain string (after type coercion).
+    - Mixed text + children: text stored under ``#text``.
+    """
+    d: dict[str, Any] = {}
+
+    # Attributes
+    for k, v in elem.attrib.items():
+        d[f"@{k}"] = _coerce_xml_value(v)
+
+    # Group children by tag
+    child_counts: Counter[str] = Counter(c.tag for c in elem)
+    child_groups: dict[str, list[Any]] = {}
+    for child in elem:
+        tag = child.tag
+        converted = _xml_elem_to_dict(child)
+        child_groups.setdefault(tag, []).append(converted)
+
+    for tag, items in child_groups.items():
+        if child_counts[tag] == 1:
+            d[tag] = items[0]
+        else:
+            d[tag] = items
+
+    # Text content
+    text = (elem.text or "").strip()
+    if text:
+        if d:
+            d["#text"] = _coerce_xml_value(text)
+        else:
+            return _coerce_xml_value(text)
+
+    return d
+
+
+def _coerce_xml_value(v: str) -> Any:
+    """Best-effort type coercion for XML text values."""
+    if v == "":
+        return None
+    try:
+        return int(v)
+    except ValueError:
+        pass
+    try:
+        return float(v)
+    except ValueError:
+        pass
+    if v.lower() == "true":
+        return True
+    if v.lower() == "false":
+        return False
+    return v
+
+
+def _try_xml(text: str) -> tuple[Any, str] | None:
+    """Detect and parse XML text into a dict structure."""
+    stripped = text.strip()
+    if not stripped.startswith("<"):
+        return None
+    try:
+        root = ET.fromstring(stripped)
+    except ET.ParseError:
+        return None
+    return _xml_elem_to_dict(root), "xml"
+
+
 # ── registry ─────────────────────────────────────────────────────────────
 
 PARSER_REGISTRY: list[Parser] = [
     Parser(name="json", try_parse=_try_json),
     Parser(name="yaml", try_parse=_try_yaml),
     Parser(name="csv", try_parse=_try_csv, normalize=_normalize_csv),
+    Parser(name="xml", try_parse=_try_xml),
 ]
 
 
