@@ -102,6 +102,11 @@ FIXTURE_METADATA: dict[str, dict] = {
         "label": "Deploy inventory XML",
         "description": "Deployment inventory — 20 deployments across 3 environments (XML format)",
     },
+    "app_performance.csv": {
+        "domain": "APM",
+        "label": "App performance CSV",
+        "description": "Application performance metrics — 30 microservices x 25 columns (CSV format, heavy elision + tuple grouping)",
+    },
 }
 
 
@@ -745,6 +750,88 @@ QUESTIONS: dict[str, list[tuple[str, str, callable]]] = {
         (
             "How many production deployments have status 'healthy'?",
             "10",
+            contains_or_numeric,
+        ),
+    ],
+    "app_performance.csv": [
+        # --- direct lookups ---
+        (
+            "How many services are in the data set?",
+            "30",
+            contains_or_numeric,
+        ),
+        (
+            "How many services have status 'healthy'?",
+            "26",
+            contains_or_numeric,
+        ),
+        (
+            "How many unique regions are there?",
+            "3",
+            contains_or_numeric,
+        ),
+        (
+            "How many services have status 'critical'?",
+            "1",
+            contains_or_numeric,
+        ),
+        # NOTE: tests TOON annotation reading — env is elided as constant
+        (
+            "What environment are all services running in?",
+            "production",
+            contains,
+        ),
+        # --- filtering, counting ---
+        (
+            "How many services are in the 'us-east-1' region?",
+            "14",
+            contains_or_numeric,
+        ),
+        (
+            "How many services belong to the 'data' team?",
+            "5",
+            contains_or_numeric,
+        ),
+        (
+            "How many services have a gc_pause_ms value (not empty)?",
+            "6",
+            contains_or_numeric,
+        ),
+        (
+            "How many services have non-zero restart_count?",
+            "4",
+            contains_or_numeric,
+        ),
+        (
+            "How many services have more than 10000 requests_per_sec?",
+            "12",
+            contains_or_numeric,
+        ),
+        # --- cross-reference, extremes ---
+        (
+            "Which service has the highest latency.p99? Give the service name only.",
+            "ml-inference",
+            contains,
+        ),
+        (
+            "Which service has the highest requests_per_sec? Give the service name only.",
+            "cdn-proxy",
+            contains,
+        ),
+        (
+            "What is the cpu_pct of the service named 'log-aggregator'?",
+            "88.5",
+            contains_or_numeric,
+        ),
+        # --- multi-hop ---
+        (
+            "How many 'commerce' team services have status 'healthy'?",
+            "8",
+            contains_or_numeric,
+        ),
+        (
+            "What is the latency.p99 of the service with the highest requests_per_sec?",
+            "22",
             contains_or_numeric,
         ),
     ],
