@@ -1,6 +1,77 @@
 # CHANGELOG
 
 
+## v0.6.0 (2026-02-23)
+
+### Features
+
+- Add live progress output to accuracy benchmark
+  ([`17c854d`](https://github.com/teriyakichild/mcp-condenser/commit/17c854d02c5687ef4dc691f529aa010c37cece5f))
+
+Print per-question status lines to stderr as the benchmark runs, showing pass/fail/skip, format,
+  fixture, question, and elapsed time.
+
+- Add max_table_columns and elide_mostly_zero_pct heuristics for wide table readability
+  ([`21ad4bd`](https://github.com/teriyakichild/mcp-condenser/commit/21ad4bd7f670b5e985ff11a17eb1372ba2c288c6))
+
+Add two new experimental heuristics to help small LLMs parse wide tables: - max_table_columns: caps
+  table width, dropping rightmost columns (identity columns survive via ordering) -
+  elide_mostly_zero_pct: removes columns where most values are zero, annotating outliers with
+  identity labels
+
+Also adds --heuristics flag to benchmarks/accuracy.py for testing strategies without code changes,
+  and updates config.py to support float-valued heuristic parameters.
+
+- Add multi-hop, arithmetic, and ranking benchmark questions
+  ([`eb47680`](https://github.com/teriyakichild/mcp-condenser/commit/eb47680aea79c05e5980f0dbb49f9aaa0c430f84))
+
+Add 12 harder questions requiring multi-step reasoning: multi-hop lookups, percentage calculations,
+  inverse filtering, ranking beyond top-1, cross-section joins, and reading elided annotation
+  values.
+
+- Add per-tool heuristic overrides and harder benchmark questions
+  ([`880e371`](https://github.com/teriyakichild/mcp-condenser/commit/880e371096c41dc6eae6a0afee85ff8c8efc415a))
+
+- tool_heuristics config allows per-tool heuristic overrides that merge on top of base server
+  heuristics - fix string value parsing in CONDENSER_HEURISTICS env var (previously coerced non-bool
+  strings to True) - add 12 harder cross-reference/comparison/aggregation benchmark questions
+
+- Expand benchmark suite with multi-model matrix and new fixtures
+  ([`cda4274`](https://github.com/teriyakichild/mcp-condenser/commit/cda4274df9ff68a7be9188da75321176f6f8b0cf))
+
+Add multi-model accuracy benchmark infrastructure: - benchmarks/fixtures.py: shared questions (90
+  across 5 fixtures), match functions, and fixture metadata extracted from accuracy.py -
+  benchmarks/matrix.py: multi-model orchestrator with resume support, incremental saves, and
+  markdown report generation - benchmarks/accuracy.py: refactored to import from fixtures.py, added
+  per-question error handling and 600s timeout
+
+Add synthetic test fixtures: - tests/fixtures/aws_ec2_instances.json: 20 EC2 instances (33K tokens,
+  87% reduction) with deterministic generator script - tests/fixtures/db_query_results.json: 150 SQL
+  order rows (26K tokens, 57% reduction) with deterministic generator script
+
+Benchmark results across 5 models (qwen3:1.7b/4b, llama3.1:8b, qwen3:14b/30b) show TOON matches or
+  beats JSON accuracy on Kubernetes fixtures (100% TOON on both K8s fixtures for all models 4b+)
+  while achieving 57-87% token reduction.
+
+Document EC2 Tags condensing gap in docs/ec2-tags-fix.md — nested tag arrays are silently dropped
+  during sub-table rendering, making 5 of 15 EC2 questions impossible to answer from TOON output.
+
+- Pivot Key-Value arrays (AWS Tags) into scalar columns
+  ([`e0c14fd`](https://github.com/teriyakichild/mcp-condenser/commit/e0c14fd1307e8a24e97e134eb1f4df437d6ab5b5))
+
+Detect [{Key, Value}] arrays (AWS tag convention) and pivot them into scalar columns on the parent
+  row (e.g. Tags.Name, Tags.Environment) instead of extracting them as cross-referenced sub-tables.
+
+### Refactoring
+
+- Split benchmark reports into separate JSON and TOON tables
+  ([`eb0cbc4`](https://github.com/teriyakichild/mcp-condenser/commit/eb0cbc4c71fc08ce958ca75fe0cdadde12a394ad))
+
+The combined JSON/TOON accuracy cells were hard to scan. Split into two independent tables and move
+  context window enablement under a "Local Models" heading since frontier models don't have those
+  limits.
+
+
 ## v0.5.1 (2026-02-21)
 
 ### Bug Fixes
