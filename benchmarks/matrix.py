@@ -36,6 +36,7 @@ DEFAULT_FIXTURES = [
     "db_query_results.json",
     "server_metrics.csv",
     "deploy_inventory.xml",
+    "app_performance.csv",
 ]
 
 LARGE_FIXTURES = [
@@ -68,8 +69,8 @@ def _pct(passed: int, total: int) -> str:
 def generate_token_table(fixtures_dir: Path, fixtures: list[str], heuristics: Heuristics | None = None) -> str:
     """Generate markdown table showing token reduction per fixture."""
     lines = [
-        "| Fixture | Domain | JSON tokens | TOON tokens | Reduction |",
-        "|---------|--------|-------------|-------------|-----------|",
+        "| Fixture | Domain | Raw tokens | TOON tokens | Reduction |",
+        "|---------|--------|------------|-------------|-----------|",
     ]
     for fixture in fixtures:
         path = fixtures_dir / fixture
@@ -96,7 +97,7 @@ def _accuracy_table(
     fixtures: list[str],
     fmt: str,
 ) -> str:
-    """Generate a single accuracy table for one format (json or toon)."""
+    """Generate a single accuracy table for one format (raw or toon)."""
     fixture_labels = [FIXTURE_METADATA.get(f, {}).get("label", f) for f in fixtures]
 
     header = "| Model | " + " | ".join(fixture_labels) + " |"
@@ -117,20 +118,20 @@ def generate_accuracy_tables(
     all_results: dict[str, list[dict]],
     fixtures: list[str],
 ) -> tuple[str, str]:
-    """Generate separate JSON and TOON accuracy tables.
+    """Generate separate Raw and TOON accuracy tables.
 
-    Returns (json_table_md, toon_table_md).
+    Returns (raw_table_md, toon_table_md).
     """
-    json_md = _accuracy_table(all_results, fixtures, "json")
+    raw_md = _accuracy_table(all_results, fixtures, "raw")
     toon_md = _accuracy_table(all_results, fixtures, "toon")
-    return json_md, toon_md
+    return raw_md, toon_md
 
 
 def generate_combined_accuracy_table(
     all_results: dict[str, list[dict]],
     fixtures: list[str],
 ) -> str:
-    """Generate a combined accuracy table with 'JSON / TOON' per cell."""
+    """Generate a combined accuracy table with 'Raw / TOON' per cell."""
     fixture_labels = [FIXTURE_METADATA.get(f, {}).get("label", f) for f in fixtures]
 
     header = "| Model | " + " | ".join(fixture_labels) + " |"
@@ -140,9 +141,9 @@ def generate_combined_accuracy_table(
     for model, results in all_results.items():
         cells = [f"**{model}**"]
         for fixture in fixtures:
-            jp, jt = _score(results, fixture, "json")
+            rp, rt = _score(results, fixture, "raw")
             tp, tt = _score(results, fixture, "toon")
-            cells.append(f"{_pct(jp, jt)} / {_pct(tp, tt)}")
+            cells.append(f"{_pct(rp, rt)} / {_pct(tp, tt)}")
         lines.append("| " + " | ".join(cells) + " |")
 
     return "\n".join(lines)
@@ -161,7 +162,7 @@ def generate_context_table(
     """Generate context window enablement table.
 
     sweep_results: {num_ctx: [result_dicts]}
-    Shows which fixtures fit in JSON vs TOON at each context size.
+    Shows which fixtures fit in raw vs TOON at each context size.
     """
     # Pre-compute token counts
     fixture_tokens: dict[str, tuple[int, int]] = {}
@@ -175,22 +176,22 @@ def generate_context_table(
 
     fixture_labels = [FIXTURE_METADATA.get(f, {}).get("label", f) for f in fixtures]
 
-    header = "| Fixture | JSON tok | TOON tok | " + " | ".join(f"{s//1024}K" for s in CONTEXT_SIZES) + " |"
-    sep = "|---------|----------|----------|" + "|".join(["-----" for _ in CONTEXT_SIZES]) + "|"
+    header = "| Fixture | Raw tok | TOON tok | " + " | ".join(f"{s//1024}K" for s in CONTEXT_SIZES) + " |"
+    sep = "|---------|---------|----------|" + "|".join(["-----" for _ in CONTEXT_SIZES]) + "|"
     lines = [header, sep]
 
     for fixture in fixtures:
         if fixture not in fixture_tokens:
             continue
-        jt, tt = fixture_tokens[fixture]
+        rt, tt = fixture_tokens[fixture]
         meta = FIXTURE_METADATA.get(fixture, {})
         label = meta.get("label", fixture)
-        cells = [label, f"{jt:,}", f"{tt:,}"]
+        cells = [label, f"{rt:,}", f"{tt:,}"]
         for ctx in CONTEXT_SIZES:
-            json_fits = fits_context_static(jt, ctx)
+            raw_fits = fits_context_static(rt, ctx)
             toon_fits = fits_context_static(tt, ctx)
-            if json_fits and toon_fits:
-                cells.append("JSON + TOON")
+            if raw_fits and toon_fits:
+                cells.append("Raw + TOON")
             elif toon_fits:
                 cells.append("**TOON only**")
             else:
@@ -320,7 +321,7 @@ def write_reports(
     token_md = generate_token_table(fixtures_dir, fixtures, heuristics=heuristics)
 
     # Separate accuracy tables
-    json_md, toon_md = generate_accuracy_tables(all_results, fixtures)
+    raw_md, toon_md = generate_accuracy_tables(all_results, fixtures)
 
     # Context enablement
     all_fixtures = fixtures + LARGE_FIXTURES
@@ -339,9 +340,9 @@ def write_reports(
         "",
         token_md,
         "",
-        "## JSON Accuracy (baseline)",
+        "## Raw Accuracy (baseline)",
         "",
-        json_md,
+        raw_md,
         "",
         "## TOON Accuracy (balanced profile)",
         "",
@@ -423,7 +424,7 @@ def main():
     parser.add_argument(
         "--toon-only",
         action="store_true",
-        help="Skip JSON baseline (halves runtime)",
+        help="Skip raw baseline (halves runtime)",
     )
 
     args = parser.parse_args()
@@ -454,7 +455,7 @@ def main():
     profile_heuristics = resolve_profile(args.profile)
     print(f"\n  Profile: {args.profile}", file=sys.stderr)
     if args.toon_only:
-        print(f"  Mode: TOON-only (skipping JSON baseline)", file=sys.stderr)
+        print(f"  Mode: TOON-only (skipping raw baseline)", file=sys.stderr)
 
     t0 = time.perf_counter()
 

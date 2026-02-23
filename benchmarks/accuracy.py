@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Accuracy benchmark: verify an LLM can answer questions from condensed output.
 
+Compares raw format (JSON, CSV, XML, etc.) against condensed TOON output.
+
 Requires a running Ollama server. Run with:
     uv run python benchmarks/accuracy.py
     uv run python benchmarks/accuracy.py --model qwen3:1.7b --toon-only
@@ -323,13 +325,13 @@ def run_benchmark(args, questions: dict | None = None) -> list[dict]:
         print(f"\n  --- {fixture} ({len(qs)} questions) ---", file=sys.stderr)
 
         for question, expected, match_fn in qs:
-            # JSON baseline (unless --toon-only)
+            # Raw baseline (unless --toon-only)
             if not args.toon_only:
                 if not fits_context(raw, args.ctx):
                     results.append({
                         "fixture": fixture,
                         "question": question[:50],
-                        "format": "json",
+                        "format": "raw",
                         "tokens": count_tokens(raw),
                         "elapsed": 0,
                         "passed": None,
@@ -337,7 +339,7 @@ def run_benchmark(args, questions: dict | None = None) -> list[dict]:
                         "expected": expected,
                     })
                     done += 1
-                    _status("-", "json", fixture, question)
+                    _status("-", "raw", fixture, question)
                 else:
                     try:
                         t0 = time.perf_counter()
@@ -347,7 +349,7 @@ def run_benchmark(args, questions: dict | None = None) -> list[dict]:
                         results.append({
                             "fixture": fixture,
                             "question": question[:50],
-                            "format": "json",
+                            "format": "raw",
                             "tokens": count_tokens(raw),
                             "elapsed": elapsed,
                             "passed": passed,
@@ -356,12 +358,12 @@ def run_benchmark(args, questions: dict | None = None) -> list[dict]:
                         })
                         done += 1
                         icon = "+" if passed else "x"
-                        _status(icon, "json", fixture, question, elapsed)
+                        _status(icon, "raw", fixture, question, elapsed)
                     except Exception as e:
                         results.append({
                             "fixture": fixture,
                             "question": question[:50],
-                            "format": "json",
+                            "format": "raw",
                             "tokens": count_tokens(raw),
                             "elapsed": 0,
                             "passed": None,
@@ -369,7 +371,7 @@ def run_benchmark(args, questions: dict | None = None) -> list[dict]:
                             "expected": expected,
                         })
                         done += 1
-                        _status("!", "json", fixture, question)
+                        _status("!", "raw", fixture, question)
 
             # Condensed TOON
             if not fits_context(condensed, args.ctx):
@@ -441,7 +443,7 @@ def print_summary(results: list[dict], fixtures_dir: Path, heuristics: Heuristic
     # Per-fixture token comparison
     fixtures_seen = sorted(set(r["fixture"] for r in results))
     print()
-    print(f"  {'Fixture':<28} {'JSON tokens':>12} {'TOON tokens':>12} {'Reduction':>10}")
+    print(f"  {'Fixture':<28} {'Raw tokens':>12} {'TOON tokens':>12} {'Reduction':>10}")
     print(f"  {'-'*28} {'-'*12} {'-'*12} {'-'*10}")
     for fixture in fixtures_seen:
         raw, data = load_sample(fixtures_dir, fixture)
@@ -468,22 +470,22 @@ def print_summary(results: list[dict], fixtures_dir: Path, heuristics: Heuristic
         )
 
     # Totals
-    json_results = [r for r in results if r["format"] == "json" and r["passed"] is not None]
+    raw_results = [r for r in results if r["format"] == "raw" and r["passed"] is not None]
     toon_results = [r for r in results if r["format"] == "toon" and r["passed"] is not None]
-    json_pass = sum(1 for r in json_results if r["passed"])
+    raw_pass = sum(1 for r in raw_results if r["passed"])
     toon_pass = sum(1 for r in toon_results if r["passed"])
-    json_time = sum(r["elapsed"] for r in json_results)
+    raw_time = sum(r["elapsed"] for r in raw_results)
     toon_time = sum(r["elapsed"] for r in toon_results)
 
     print()
-    if json_results:
-        print(f"  {'JSON accuracy:':<20} {json_pass}/{len(json_results)}  ({json_pass/len(json_results)*100:.0f}%)")
+    if raw_results:
+        print(f"  {'Raw accuracy:':<20} {raw_pass}/{len(raw_results)}  ({raw_pass/len(raw_results)*100:.0f}%)")
     print(f"  {'TOON accuracy:':<20} {toon_pass}/{len(toon_results)}  ({toon_pass/len(toon_results)*100:.0f}%)")
-    if json_results:
-        print(f"  {'JSON total time:':<20} {json_time:.1f}s")
+    if raw_results:
+        print(f"  {'Raw total time:':<20} {raw_time:.1f}s")
     print(f"  {'TOON total time:':<20} {toon_time:.1f}s")
-    if json_time > 0 and toon_time > 0:
-        print(f"  {'Speedup:':<20} {json_time/toon_time:.1f}x")
+    if raw_time > 0 and toon_time > 0:
+        print(f"  {'Speedup:':<20} {raw_time/toon_time:.1f}x")
     print()
 
     # Failure details
@@ -570,7 +572,7 @@ def main():
     parser.add_argument(
         "--toon-only",
         action="store_true",
-        help="Skip JSON baseline (halves runtime)",
+        help="Skip raw baseline (halves runtime)",
     )
 
     parser.add_argument(
@@ -625,7 +627,7 @@ def main():
     else:
         print_summary(results, Path(args.fixtures_dir), heuristics=args.heuristics_obj, heuristic_overrides=args.heuristic_overrides)
 
-    # Exit 1 if any TOON answers failed
+    # Exit 1 if any condensed TOON answers failed
     toon_results = [r for r in results if r["format"] == "toon" and r["passed"] is not None]
     if any(not r["passed"] for r in toon_results):
         sys.exit(1)
