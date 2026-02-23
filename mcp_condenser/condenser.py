@@ -36,6 +36,8 @@ class Heuristics:
     max_table_columns: int = 0       # 0 = no limit
     elide_mostly_zero_pct: float = 0.0  # 0.0 = disabled
     pivot_key_value: bool = True
+    wide_table_threshold: int = 0       # 0 = disabled; tables wider switch format
+    wide_table_format: str = "vertical" # "vertical" or "split"
 
 try:
     import tiktoken
@@ -466,17 +468,125 @@ def preprocess_table(name: str, arr: list, heuristics: Heuristics | None = None)
     return annotations, cleaned_rows, final
 
 
+def _find_identity_from_cleaned(headers: list[str], cleaned_rows: list[dict]) -> str | None:
+    """Find best identity column from cleaned rows (post-preprocessing headers).
+
+    Uses cardinality to break ties when multiple columns match the same keyword.
+    """
+    id_kw = ["name", "id", "uid"]
+    for kw in id_kw:
+        matches = [h for h in headers if h.split(".")[-1].lower() == kw]
+        if not matches:
+            continue
+        if len(matches) == 1:
+            return matches[0]
+        # Pick column with highest cardinality
+        def _card(col):
+            vals = {fmt(row.get(col)) for row in cleaned_rows}
+            vals.discard("")
+            return len(vals)
+        return max(matches, key=_card)
+    return None
+
+
+def render_vertical(name: str, arr: list, annotations: list[str], cleaned_rows: list[dict], final_cols: list[tuple[str, list[str]]]) -> str:
+    """Render a wide table as vertical key-value blocks per row.
+
+    Each row becomes a named section with indented key: value lines.
+    """
+    headers = [h for h, _ in final_cols]
+    id_col = _find_identity_from_cleaned(headers, cleaned_rows)
+
+    parts = [f"--- {name} ({len(arr)} rows) ---"]
+    parts.extend(annotations)
+
+    for i, row in enumerate(cleaned_rows):
+        # Determine section label
+        if id_col and id_col in row:
+            label = fmt(row[id_col])
+            if not label:
+                label = f"row {i}"
+        else:
+            label = f"row {i}"
+        parts.append("")
+        parts.append(f"  [{label}]")
+        for h in headers:
+            if h == id_col:
+                continue
+            val = fmt(row.get(h))
+            parts.append(f"  {h}: {val}")
+
+    return "\n".join(parts)
+
+
+def render_split(name: str, arr: list, annotations: list[str], cleaned_rows: list[dict], final_cols: list[tuple[str, list[str]]], heuristics: Heuristics) -> str:
+    """Render a wide table as multiple narrow sub-tables grouped by column prefix.
+
+    Columns are grouped by their first dotted segment. Identity columns are
+    repeated in every sub-table for context.
+    """
+    headers = [h for h, _ in final_cols]
+
+    # Detect identity columns
+    id_kw = {"name", "id", "ref", "uid", "namespace", "label", "nodename"}
+    identity_cols = [h for h in headers if h.split(".")[-1].lower() in id_kw]
+
+    # Group columns by top-level prefix
+    groups: dict[str, list[str]] = OrderedDict()
+    for h in headers:
+        if h in identity_cols:
+            continue
+        if "." in h:
+            prefix = h.split(".")[0]
+        else:
+            prefix = "_misc"
+        groups.setdefault(prefix, []).append(h)
+
+    # Merge single-column groups into _misc
+    merged: dict[str, list[str]] = OrderedDict()
+    for prefix, cols in groups.items():
+        non_identity = [c for c in cols if c not in identity_cols]
+        if len(non_identity) <= 1 and prefix != "_misc":
+            merged.setdefault("_misc", []).extend(cols)
+        else:
+            merged[prefix] = cols
+    groups = merged
+
+    # Build output
+    parts = [f"--- {name} ({len(arr)} rows) ---"]
+    parts.extend(annotations)
+
+    for prefix, cols in groups.items():
+        sub_cols = identity_cols + cols
+        # Build sub-rows
+        sub_rows = []
+        for row in cleaned_rows:
+            sub_row = OrderedDict()
+            for c in sub_cols:
+                sub_row[c] = row.get(c, "")
+            sub_rows.append(sub_row)
+
+        sub_name = f"{name}.{prefix}" if prefix != "_misc" else f"{name}._misc"
+        sub_toon = toon_format.encode(sub_rows)
+        parts.append("")
+        parts.append(f"--- {sub_name} ({len(arr)} rows) ---")
+        parts.append(sub_toon)
+
+    return "\n".join(parts)
+
+
 def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> list[str]:
     """Render a homogeneous array as TOON table block(s).
 
     Returns list of text blocks (parent table + any extracted sub-tables).
     """
+    if heuristics is None:
+        heuristics = Heuristics()
+
     if not arr:
         return [f"--- {name} ---\n(empty)"]
 
     blocks = []
-    if heuristics is None:
-        heuristics = Heuristics()
 
     # Flatten and optionally pivot KV arrays into scalar columns
     all_flat = [flatten(item) for item in arr]
@@ -525,15 +635,21 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
     # (array fields are excluded by union_columns since they skip list values)
     annotations, cleaned_rows, final_cols = preprocess_table(name, all_flat, heuristics)
 
-    # Encode with TOON
-    toon_text = toon_format.encode(cleaned_rows)
-
-    # Build parent block
-    header = f"--- {name} ({len(arr)} rows) ---"
-    parts = [header]
-    parts.extend(annotations)
-    parts.append(toon_text)
-    blocks.append("\n".join(parts))
+    # Check wide table threshold — switch rendering format if exceeded
+    if heuristics.wide_table_threshold > 0 and len(final_cols) > heuristics.wide_table_threshold:
+        if heuristics.wide_table_format == "split":
+            block = render_split(name, arr, annotations, cleaned_rows, final_cols, heuristics)
+        else:
+            block = render_vertical(name, arr, annotations, cleaned_rows, final_cols)
+        blocks.append(block)
+    else:
+        # Standard tabular path
+        toon_text = toon_format.encode(cleaned_rows)
+        header = f"--- {name} ({len(arr)} rows) ---"
+        parts = [header]
+        parts.extend(annotations)
+        parts.append(toon_text)
+        blocks.append("\n".join(parts))
 
     # Render sub-tables
     for af, sub_items in sorted(sub_tables.items()):
@@ -541,13 +657,21 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
         # Wrap sub_items back into dicts for render_table recursion
         # sub_items are already flat dicts, wrap in list
         sub_annotations, sub_cleaned, sub_final = preprocess_table(sub_name, [dict(si) for si in sub_items], heuristics)
-        sub_toon = toon_format.encode(sub_cleaned)
 
-        sub_header = f"--- {sub_name} ({len(sub_items)} rows) ---"
-        sub_parts = [sub_header]
-        sub_parts.extend(sub_annotations)
-        sub_parts.append(sub_toon)
-        blocks.append("\n".join(sub_parts))
+        # Apply same threshold/format check for sub-tables
+        if heuristics.wide_table_threshold > 0 and len(sub_final) > heuristics.wide_table_threshold:
+            if heuristics.wide_table_format == "split":
+                block = render_split(sub_name, sub_items, sub_annotations, sub_cleaned, sub_final, heuristics)
+            else:
+                block = render_vertical(sub_name, sub_items, sub_annotations, sub_cleaned, sub_final)
+            blocks.append(block)
+        else:
+            sub_toon = toon_format.encode(sub_cleaned)
+            sub_header = f"--- {sub_name} ({len(sub_items)} rows) ---"
+            sub_parts = [sub_header]
+            sub_parts.extend(sub_annotations)
+            sub_parts.append(sub_toon)
+            blocks.append("\n".join(sub_parts))
 
     return blocks
 

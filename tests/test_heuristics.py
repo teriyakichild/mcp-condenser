@@ -57,6 +57,8 @@ class TestHeuristicsDataclass:
         assert h.max_table_columns == 0
         assert h.elide_mostly_zero_pct == 0.0
         assert h.pivot_key_value is True
+        assert h.wide_table_threshold == 0
+        assert h.wide_table_format == "vertical"
 
     def test_override_single(self):
         h = Heuristics(elide_timestamps=False)
@@ -377,3 +379,181 @@ class TestPivotKeyValueToggle:
         data = json.dumps([{"a": 1, "b": 2}, {"a": 3, "b": 4}])
         with pytest.raises(TypeError, match="Valid heuristic names are"):
             mw._condense_item(data, "some_tool", cfg)
+
+
+class TestWideTableVertical:
+    """Tests for vertical rendering of wide tables."""
+
+    def _make_wide_rows(self):
+        """Build rows with 15+ columns (identity + dotted groups)."""
+        rows = []
+        for name in ["pod-a", "pod-b", "pod-c"]:
+            rows.append({
+                "podRef": {"name": name, "namespace": "default"},
+                "cpu": {"usageCoreNanoSeconds": 100, "usageNanoCores": 200},
+                "memory": {"rssBytes": 300, "usageBytes": 400, "workingSetBytes": 500},
+                "col6": 6, "col7": 7, "col8": 8, "col9": 9,
+                "col10": 10, "col11": 11, "col12": 12, "col13": 13,
+            })
+        return rows
+
+    def test_below_threshold_uses_tabular(self):
+        """When columns <= threshold, normal TOON is used."""
+        rows = self._make_wide_rows()
+        h = Heuristics(wide_table_threshold=50, wide_table_format="vertical",
+                        elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        blocks = render_table("pods", rows, h)
+        text = "\n\n".join(blocks)
+        # Should NOT have vertical [label] format
+        assert "[pod-a]" not in text
+        # Should have standard TOON format
+        assert "{" in text
+
+    def test_above_threshold_uses_vertical(self):
+        """When columns > threshold, vertical format with [label] sections."""
+        rows = self._make_wide_rows()
+        h = Heuristics(wide_table_threshold=5, wide_table_format="vertical",
+                        elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        blocks = render_table("pods", rows, h)
+        text = "\n\n".join(blocks)
+        assert "[pod-a]" in text
+        assert "[pod-b]" in text
+        assert "[pod-c]" in text
+        # Each row should have key: value lines
+        assert "memory.rssBytes: 300" in text
+
+    def test_vertical_omits_identity_from_body(self):
+        """Identity column appears in header, not body."""
+        rows = self._make_wide_rows()
+        h = Heuristics(wide_table_threshold=5, wide_table_format="vertical",
+                        elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        blocks = render_table("pods", rows, h)
+        text = "\n\n".join(blocks)
+        # Identity col (podRef.name) should be in [label] but not as "podRef.name: pod-a" body line
+        assert "[pod-a]" in text
+        lines = text.split("\n")
+        body_lines = [l for l in lines if l.strip().startswith("podRef.name:")]
+        assert len(body_lines) == 0
+
+    def test_vertical_preserves_all_values(self):
+        """No data loss — all non-identity values present."""
+        rows = self._make_wide_rows()
+        h = Heuristics(wide_table_threshold=5, wide_table_format="vertical",
+                        elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        blocks = render_table("pods", rows, h)
+        text = "\n\n".join(blocks)
+        assert "cpu.usageCoreNanoSeconds: 100" in text
+        assert "cpu.usageNanoCores: 200" in text
+        assert "memory.rssBytes: 300" in text
+        assert "col13: 13" in text
+
+    def test_zero_means_disabled(self):
+        """wide_table_threshold=0 always uses tabular."""
+        rows = self._make_wide_rows()
+        h = Heuristics(wide_table_threshold=0, wide_table_format="vertical",
+                        elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        blocks = render_table("pods", rows, h)
+        text = "\n\n".join(blocks)
+        assert "[pod-a]" not in text
+        assert "{" in text
+
+    def test_fallback_to_row_numbering(self):
+        """When no identity column exists, rows numbered [row 0], [row 1]."""
+        rows = [
+            {"val1": 1, "val2": 2, "val3": 3, "val4": 4, "val5": 5, "val6": 6},
+            {"val1": 7, "val2": 8, "val3": 9, "val4": 10, "val5": 11, "val6": 12},
+        ]
+        h = Heuristics(wide_table_threshold=3, wide_table_format="vertical",
+                        elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        blocks = render_table("data", rows, h)
+        text = "\n\n".join(blocks)
+        assert "[row 0]" in text
+        assert "[row 1]" in text
+
+
+class TestWideTableSplit:
+    """Tests for split rendering of wide tables."""
+
+    def _make_wide_rows(self):
+        """Build rows with dotted-prefix columns for grouping."""
+        rows = []
+        for name in ["pod-a", "pod-b"]:
+            rows.append({
+                "podRef": {"name": name, "namespace": "default"},
+                "cpu": {"usageCoreNanoSeconds": 100, "usageNanoCores": 200},
+                "memory": {"rssBytes": 300, "usageBytes": 400, "workingSetBytes": 500},
+                "misc_col": 99,
+            })
+        return rows
+
+    def test_splits_by_prefix(self):
+        """Columns grouped by first dot segment into separate tables."""
+        rows = self._make_wide_rows()
+        h = Heuristics(wide_table_threshold=4, wide_table_format="split",
+                        elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        blocks = render_table("pods", rows, h)
+        text = "\n\n".join(blocks)
+        assert "--- pods.cpu" in text
+        assert "--- pods.memory" in text
+
+    def test_identity_columns_in_every_split(self):
+        """Identity cols repeated in each sub-table."""
+        rows = self._make_wide_rows()
+        h = Heuristics(wide_table_threshold=4, wide_table_format="split",
+                        elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        blocks = render_table("pods", rows, h)
+        text = "\n\n".join(blocks)
+        # Find all sub-table sections
+        sections = text.split("--- pods.")
+        # Each sub-table section should contain identity column references
+        for section in sections[1:]:  # skip the main header
+            assert "podRef.name" in section
+
+    def test_small_groups_merged(self):
+        """Single non-identity column groups go into _misc."""
+        rows = self._make_wide_rows()
+        h = Heuristics(wide_table_threshold=4, wide_table_format="split",
+                        elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        blocks = render_table("pods", rows, h)
+        text = "\n\n".join(blocks)
+        # misc_col has no dot prefix, plus podRef.namespace is identity — misc_col should be in _misc
+        assert "--- pods._misc" in text
+
+    def test_split_preserves_all_values(self):
+        """No data loss — all values found somewhere in output."""
+        rows = self._make_wide_rows()
+        h = Heuristics(wide_table_threshold=4, wide_table_format="split",
+                        elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        blocks = render_table("pods", rows, h)
+        text = "\n\n".join(blocks)
+        assert "100" in text  # cpu.usageCoreNanoSeconds
+        assert "300" in text  # memory.rssBytes
+        assert "99" in text   # misc_col
+
+    def test_format_selection(self):
+        """wide_table_format=split uses split, vertical uses vertical."""
+        rows = self._make_wide_rows()
+        h_split = Heuristics(wide_table_threshold=4, wide_table_format="split",
+                              elide_all_zero=False, elide_all_null=False,
+                              elide_timestamps=False, elide_constants=False, group_tuples=False)
+        h_vert = Heuristics(wide_table_threshold=4, wide_table_format="vertical",
+                             elide_all_zero=False, elide_all_null=False,
+                             elide_timestamps=False, elide_constants=False, group_tuples=False)
+        split_text = "\n\n".join(render_table("pods", rows, h_split))
+        vert_text = "\n\n".join(render_table("pods", rows, h_vert))
+        # Split should have sub-table headers
+        assert "--- pods.cpu" in split_text
+        # Vertical should have [label] sections
+        assert "[pod-a]" in vert_text
+        # They should be different
+        assert split_text != vert_text
