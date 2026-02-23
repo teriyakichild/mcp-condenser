@@ -135,3 +135,68 @@ class TestParseInputError:
     def test_plain_scalar_rejected(self):
         with pytest.raises(ValueError):
             parse_input("just a string")
+
+
+class TestCsvParser:
+    """Tests for the CSV/TSV parser."""
+
+    def test_basic_csv(self):
+        text = "name,age,city\nalice,30,nyc\nbob,25,sf\n"
+        data, fmt = parse_input(text)
+        assert fmt == "csv"
+        assert len(data) == 2
+        assert data[0]["name"] == "alice"
+        assert data[0]["age"] == 30
+        assert data[1]["city"] == "sf"
+
+    def test_tsv(self):
+        text = "name\tage\tcity\nalice\t30\tnyc\nbob\t25\tsf\n"
+        data, fmt = parse_input(text)
+        assert fmt == "csv"
+        assert data[0]["name"] == "alice"
+        assert data[0]["age"] == 30
+
+    def test_type_inference_int_float_none(self):
+        text = "a,b,c,d\n1,2.5,,hello\n"
+        data, fmt = parse_input(text)
+        assert fmt == "csv"
+        assert data[0]["a"] == 1
+        assert isinstance(data[0]["a"], int)
+        assert data[0]["b"] == 2.5
+        assert isinstance(data[0]["b"], float)
+        assert data[0]["c"] is None
+        assert data[0]["d"] == "hello"
+
+    def test_single_line_rejected(self):
+        """Header-only CSV (no data rows) should not match."""
+        with pytest.raises(ValueError):
+            parse_input("name,age,city\n")
+
+    def test_single_column_rejected(self):
+        """A single-column CSV is not useful structured data."""
+        with pytest.raises(ValueError):
+            parse_input("name\nalice\nbob\n")
+
+    def test_json_preferred_over_csv(self):
+        """JSON-like text should parse as JSON, not CSV."""
+        text = '{"name": "alice", "age": 30}'
+        data, fmt = parse_input(text)
+        assert fmt == "json"
+
+    def test_yaml_preferred_over_csv(self):
+        """YAML-like text should parse as YAML, not CSV."""
+        text = "name: alice\nage: 30\n"
+        data, fmt = parse_input(text)
+        assert fmt == "yaml"
+
+    def test_format_hint_csv(self):
+        """With hint='csv', CSV is tried first."""
+        text = "name,age,city\nalice,30,nyc\nbob,25,sf\n"
+        data, fmt = parse_input(text, format_hint="csv")
+        assert fmt == "csv"
+        assert len(data) == 2
+
+    def test_registry_order(self):
+        names = [p.name for p in PARSER_REGISTRY]
+        assert names.index("csv") > names.index("json")
+        assert names.index("csv") > names.index("yaml")

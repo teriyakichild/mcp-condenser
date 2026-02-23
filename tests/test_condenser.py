@@ -234,6 +234,27 @@ class TestCondenseYaml:
         assert "default" in result
 
 
+class TestCondenseCsv:
+    """Integration: CSV text → parse_input → condense_text → TOON table."""
+
+    def test_csv_to_toon_table(self):
+        csv_text = "name,age,city\nalice,30,nyc\nbob,25,sf\ncarol,40,la\n"
+        data, fmt = parse_input(csv_text)
+        assert fmt == "csv"
+        result = condense_text(data)
+        assert "3 rows" in result
+        assert "alice" in result
+        assert "bob" in result
+        assert "carol" in result
+
+    def test_csv_type_inference_in_toon(self):
+        csv_text = "item,price,qty\nwidget,9.99,100\ngadget,24.50,50\n"
+        data, _ = parse_input(csv_text)
+        result = condense_text(data)
+        assert "9.99" in result
+        assert "100" in result
+
+
 class TestTruncateToTokenLimit:
     def test_no_op_when_under_limit(self):
         """Text within the token limit is returned unchanged."""
