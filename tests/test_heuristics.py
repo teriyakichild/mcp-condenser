@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from mcp_condenser.condenser import PROFILES, Heuristics, condense_json, preprocess_table, render_table, resolve_profile
+from mcp_condenser.condenser import PROFILES, Heuristics, condense_text, preprocess_table, render_table, resolve_profile
 from mcp_condenser.config import ServerConfig
 from mcp_condenser.proxy import CondenserMiddleware
 
@@ -158,13 +158,13 @@ class TestGroupTuplesToggle:
 class TestCondenseJsonWithHeuristics:
     def test_default_heuristics_matches_no_arg(self):
         data = {"items": _make_rows()}
-        default_result = condense_json(data)
-        explicit_result = condense_json(data, heuristics=Heuristics())
+        default_result = condense_text(data)
+        explicit_result = condense_text(data, heuristics=Heuristics())
         assert default_result == explicit_result
 
     def test_disabled_timestamp_elision_preserves_ts(self):
         data = {"items": _make_rows()}
-        result = condense_json(data, heuristics=Heuristics(elide_timestamps=False))
+        result = condense_text(data, heuristics=Heuristics(elide_timestamps=False))
         # With timestamps not elided, the ts values should appear in the output
         assert "2024-01-01T00:00:00Z" in result
 
@@ -177,7 +177,7 @@ class TestCondenseJsonWithHeuristics:
             elide_constants=False,
             group_tuples=False,
         )
-        result = condense_json(data, heuristics=h)
+        result = condense_text(data, heuristics=h)
         # No elision annotations should be present
         assert "elided" not in result
         # All column values should be present

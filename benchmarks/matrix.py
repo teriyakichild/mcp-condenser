@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
-from mcp_condenser.condenser import Heuristics, PROFILES, condense_json, count_tokens, resolve_profile
+from mcp_condenser.condenser import Heuristics, PROFILES, condense_text, count_tokens, resolve_profile
 
 from benchmarks.accuracy import ask_ollama, fits_context, run_benchmark
 from benchmarks.fixtures import FIXTURE_METADATA, QUESTIONS, load_sample
@@ -74,7 +74,7 @@ def generate_token_table(fixtures_dir: Path, fixtures: list[str], heuristics: He
         if not path.exists():
             continue
         raw, data = load_sample(fixtures_dir, fixture)
-        condensed = condense_json(data, heuristics=heuristics)
+        condensed = condense_text(data, heuristics=heuristics)
         rt = count_tokens(raw)
         ct = count_tokens(condensed)
         pct = (1 - ct / rt) * 100
@@ -168,7 +168,7 @@ def generate_context_table(
         if not path.exists():
             continue
         raw, data = load_sample(fixtures_dir, fixture)
-        condensed = condense_json(data, heuristics=heuristics)
+        condensed = condense_text(data, heuristics=heuristics)
         fixture_tokens[fixture] = (count_tokens(raw), count_tokens(condensed))
 
     fixture_labels = [FIXTURE_METADATA.get(f, {}).get("label", f) for f in fixtures]

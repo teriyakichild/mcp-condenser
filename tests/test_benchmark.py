@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from mcp_condenser.condenser import condense_json, toon_encode_json, count_tokens
+from mcp_condenser.condenser import condense_text, toon_encode, count_tokens
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -36,11 +36,11 @@ class TestBenchmarkTokenReduction:
     def test_condense_reduces_tokens(self, filename):
         raw, data = load_sample(filename)
         orig_tokens = count_tokens(raw)
-        condensed = condense_json(data)
+        condensed = condense_text(data)
         cond_tokens = count_tokens(condensed)
         reduction = 1 - cond_tokens / orig_tokens
         assert reduction >= 0.40, (
-            f"{filename}: condense_json only achieved {reduction:.1%} reduction "
+            f"{filename}: condense_text only achieved {reduction:.1%} reduction "
             f"({orig_tokens} -> {cond_tokens} tokens)"
         )
 
@@ -50,28 +50,28 @@ class TestBenchmarkTokenReduction:
 
         Note: deeply nested structures may expand slightly since TOON
         format adds structure overhead without the preprocessing elision
-        that condense_json provides. We use a lenient floor here.
+        that condense_text provides. We use a lenient floor here.
         """
         raw, data = load_sample(filename)
         orig_tokens = count_tokens(raw)
-        toon = toon_encode_json(data)
+        toon = toon_encode(data)
         toon_tokens = count_tokens(toon)
         reduction = 1 - toon_tokens / orig_tokens
         assert reduction >= -0.15, (
-            f"{filename}: toon_encode_json expanded too much ({reduction:.1%}), "
+            f"{filename}: toon_encode expanded too much ({reduction:.1%}), "
             f"({orig_tokens} -> {toon_tokens} tokens)"
         )
 
     @pytest.mark.parametrize("filename", SAMPLES)
     def test_condense_better_than_toon_only(self, filename):
         _, data = load_sample(filename)
-        condensed = condense_json(data)
-        toon = toon_encode_json(data)
+        condensed = condense_text(data)
+        toon = toon_encode(data)
         cond_tokens = count_tokens(condensed)
         toon_tokens = count_tokens(toon)
         assert cond_tokens <= toon_tokens, (
-            f"{filename}: condense_json ({cond_tokens} tokens) should produce "
-            f"fewer tokens than toon_encode_json ({toon_tokens} tokens)"
+            f"{filename}: condense_text ({cond_tokens} tokens) should produce "
+            f"fewer tokens than toon_encode ({toon_tokens} tokens)"
         )
 
 
@@ -82,17 +82,17 @@ class TestBenchmarkPerformance:
     def test_condense_performance(self, filename):
         _, data = load_sample(filename)
         start = time.perf_counter()
-        condense_json(data)
+        condense_text(data)
         elapsed = time.perf_counter() - start
-        assert elapsed < 5.0, f"{filename}: condense_json took {elapsed:.2f}s (limit 5s)"
+        assert elapsed < 5.0, f"{filename}: condense_text took {elapsed:.2f}s (limit 5s)"
 
     @pytest.mark.parametrize("filename", SAMPLES)
     def test_toon_encode_performance(self, filename):
         _, data = load_sample(filename)
         start = time.perf_counter()
-        toon_encode_json(data)
+        toon_encode(data)
         elapsed = time.perf_counter() - start
-        assert elapsed < 5.0, f"{filename}: toon_encode_json took {elapsed:.2f}s (limit 5s)"
+        assert elapsed < 5.0, f"{filename}: toon_encode took {elapsed:.2f}s (limit 5s)"
 
 
 class TestBenchmarkSummary:
@@ -105,11 +105,11 @@ class TestBenchmarkSummary:
             orig_tokens = count_tokens(raw)
 
             t0 = time.perf_counter()
-            condensed = condense_json(data)
+            condensed = condense_text(data)
             t_condense = time.perf_counter() - t0
 
             t0 = time.perf_counter()
-            toon = toon_encode_json(data)
+            toon = toon_encode(data)
             t_toon = time.perf_counter() - t0
 
             cond_tokens = count_tokens(condensed)

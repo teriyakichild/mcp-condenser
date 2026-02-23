@@ -14,7 +14,7 @@ Usage:
     python condenser.py input.json -o out.txt -q
 """
 
-import json, sys, re, argparse
+import json, sys, re, argparse, warnings
 from dataclasses import dataclass
 from typing import Any
 from collections import OrderedDict, defaultdict
@@ -745,7 +745,8 @@ def _join_blocks(blocks: list[str]) -> str:
     return "\n\n".join(parts)
 
 
-def condense_json(data: Any, heuristics: Heuristics | None = None) -> str:
+def condense_text(data: Any, heuristics: Heuristics | None = None) -> str:
+    """Condense parsed structured data into compact TOON text."""
     if isinstance(data, dict):
         blocks = []
         for k in data:
@@ -754,9 +755,29 @@ def condense_json(data: Any, heuristics: Heuristics | None = None) -> str:
     return _join_blocks(condense("root", data, heuristics))
 
 
-def toon_encode_json(data: Any) -> str:
-    """Convert JSON data directly to TOON format without semantic preprocessing."""
+def toon_encode(data: Any) -> str:
+    """Convert structured data directly to TOON format without semantic preprocessing."""
     return toon_format.encode(data)
+
+
+# ── deprecated aliases ───────────────────────────────────────────────────
+
+def condense_json(data: Any, heuristics: Heuristics | None = None) -> str:  # noqa: D103
+    warnings.warn(
+        "condense_json() is deprecated, use condense_text() instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return condense_text(data, heuristics=heuristics)
+
+
+def toon_encode_json(data: Any) -> str:  # noqa: D103
+    warnings.warn(
+        "toon_encode_json() is deprecated, use toon_encode() instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return toon_encode(data)
 
 
 # ── truncation ────────────────────────────────────────────────────────────────
@@ -848,7 +869,7 @@ def main():
     data, input_fmt = parse_input(raw)
 
     orig = raw
-    result = condense_json(data)
+    result = condense_text(data)
 
     if not args.quiet:
         s = stats(orig, result)

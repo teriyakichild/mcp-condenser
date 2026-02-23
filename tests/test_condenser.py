@@ -1,10 +1,12 @@
 """Basic tests for condenser core functions."""
 
+import warnings
 from collections import OrderedDict
 
 import pytest
 
-from mcp_condenser.condenser import classify, flatten, find_identity_column, is_homogeneous_array, is_kv_array, pivot_kv_fields, condense_json, toon_encode_json, parse_input, truncate_to_token_limit, count_tokens
+from mcp_condenser.condenser import classify, flatten, find_identity_column, is_homogeneous_array, is_kv_array, pivot_kv_fields, condense_text, toon_encode, condense_json, toon_encode_json, truncate_to_token_limit, count_tokens
+from mcp_condenser.parsers import parse_input
 
 
 class TestClassify:
@@ -71,10 +73,10 @@ class TestIsHomogeneousArray:
         assert is_homogeneous_array(arr) is False
 
 
-class TestCondenseJson:
+class TestCondenseText:
     def test_simple_object(self):
         data = {"name": "test", "value": 42}
-        result = condense_json(data)
+        result = condense_text(data)
         assert "name" in result
         assert "test" in result
         assert "42" in result
@@ -85,7 +87,7 @@ class TestCondenseJson:
             {"id": 2, "name": "bob"},
             {"id": 3, "name": "carol"},
         ]
-        result = condense_json(data)
+        result = condense_text(data)
         assert "alice" in result
         assert "bob" in result
         assert "carol" in result
@@ -94,13 +96,13 @@ class TestCondenseJson:
 
     def test_nested_object(self):
         data = {"outer": {"inner": {"deep": "value"}}}
-        result = condense_json(data)
+        result = condense_text(data)
         assert "deep" in result
         assert "value" in result
 
     def test_scalar_value(self):
-        assert "hello" in condense_json("hello")
-        assert "42" in condense_json(42)
+        assert "hello" in condense_text("hello")
+        assert "42" in condense_text(42)
 
     def test_round_trip_preserves_data(self):
         """All scalar values from the input should appear in the output."""
@@ -108,16 +110,16 @@ class TestCondenseJson:
             {"name": "x", "count": 10},
             {"name": "y", "count": 20},
         ]}
-        result = condense_json(data)
+        result = condense_text(data)
         for val in ("x", "y", "10", "20"):
             assert val in result
 
 
-class TestToonEncodeJson:
+class TestToonEncode:
     def test_basic_array(self):
         """Direct TOON encoding of a homogeneous array without elision."""
         data = [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
-        result = toon_encode_json(data)
+        result = toon_encode(data)
         # All values preserved — no elision
         for val in ("1", "2", "3", "4"):
             assert val in result
@@ -127,27 +129,27 @@ class TestToonEncodeJson:
 
     def test_simple_object(self):
         data = {"name": "test", "value": 42}
-        result = toon_encode_json(data)
+        result = toon_encode(data)
         assert "name" in result
         assert "test" in result
         assert "42" in result
 
     def test_preserves_all_values(self):
-        """Verify no data is lost — toon_encode_json should not elide anything."""
+        """Verify no data is lost — toon_encode should not elide anything."""
         data = [
             {"id": 1, "status": "ok", "count": 0},
             {"id": 2, "status": "ok", "count": 0},
             {"id": 3, "status": "ok", "count": 0},
         ]
-        result = toon_encode_json(data)
-        # condense_json would elide constant "status" and all-zero "count",
-        # but toon_encode_json should preserve them
+        result = toon_encode(data)
+        # condense_text would elide constant "status" and all-zero "count",
+        # but toon_encode should preserve them
         for val in ("1", "2", "3", "ok", "0"):
             assert val in result
 
     def test_scalar(self):
-        assert "hello" in toon_encode_json("hello")
-        assert "42" in toon_encode_json(42)
+        assert "hello" in toon_encode("hello")
+        assert "42" in toon_encode(42)
 
 
 class TestParseInput:
@@ -203,7 +205,7 @@ class TestCondenseYaml:
     def test_yaml_object_condenses(self):
         text = "name: test\nvalue: 42\n"
         data, _ = parse_input(text)
-        result = condense_json(data)
+        result = condense_text(data)
         assert "test" in result
         assert "42" in result
 
@@ -214,7 +216,7 @@ class TestCondenseYaml:
             "- id: 3\n  name: carol\n"
         )
         data, _ = parse_input(text)
-        result = condense_json(data)
+        result = condense_text(data)
         assert "3 rows" in result
         assert "alice" in result
 
@@ -227,7 +229,7 @@ class TestCondenseYaml:
             "  replicas: 3\n"
         )
         data, _ = parse_input(text)
-        result = condense_json(data)
+        result = condense_text(data)
         assert "nginx" in result
         assert "default" in result
 
@@ -429,7 +431,7 @@ class TestEc2TagsPivot:
                 },
             ],
         }
-        result = condense_json(data)
+        result = condense_text(data)
         # Pivoted tag columns should appear
         assert "Tags.Name" in result
         assert "Tags.Environment" in result
@@ -438,3 +440,33 @@ class TestEc2TagsPivot:
         assert "api-1" in result
         # Should NOT have a separate sub-table for Tags
         assert "Instances.Tags" not in result
+
+
+class TestDeprecatedAliases:
+    def test_condense_json_warns(self):
+        with pytest.warns(DeprecationWarning, match="condense_json.*deprecated"):
+            result = condense_json({"a": 1})
+        assert "a" in result
+
+    def test_toon_encode_json_warns(self):
+        with pytest.warns(DeprecationWarning, match="toon_encode_json.*deprecated"):
+            result = toon_encode_json({"a": 1})
+        assert "a" in result
+
+    def test_condense_json_delegates(self):
+        """Deprecated alias produces same output as condense_text."""
+        data = [{"id": 1, "name": "alice"}, {"id": 2, "name": "bob"}]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            old = condense_json(data)
+        new = condense_text(data)
+        assert old == new
+
+    def test_toon_encode_json_delegates(self):
+        """Deprecated alias produces same output as toon_encode."""
+        data = {"x": 1}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            old = toon_encode_json(data)
+        new = toon_encode(data)
+        assert old == new

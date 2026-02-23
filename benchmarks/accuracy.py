@@ -13,7 +13,7 @@ import sys
 import time
 from pathlib import Path
 
-from mcp_condenser.condenser import PROFILES, Heuristics, condense_json, count_tokens
+from mcp_condenser.condenser import PROFILES, Heuristics, condense_text, count_tokens
 
 from benchmarks.fixtures import (
     QUESTIONS,
@@ -333,7 +333,7 @@ def run_benchmark(args, questions: dict | None = None) -> list[dict]:
             continue
 
         raw, data = load_sample(fixtures_dir, fixture)
-        condensed = condense_json(data, heuristics=h)
+        condensed = condense_text(data, heuristics=h)
 
         print(f"\n  --- {fixture} ({len(qs)} questions) ---", file=sys.stderr)
 
@@ -460,7 +460,7 @@ def print_summary(results: list[dict], fixtures_dir: Path, heuristics: Heuristic
     print(f"  {'-'*28} {'-'*12} {'-'*12} {'-'*10}")
     for fixture in fixtures_seen:
         raw, data = load_sample(fixtures_dir, fixture)
-        condensed = condense_json(data, heuristics=heuristics)
+        condensed = condense_text(data, heuristics=heuristics)
         rt = count_tokens(raw)
         ct = count_tokens(condensed)
         pct = (1 - ct / rt) * 100

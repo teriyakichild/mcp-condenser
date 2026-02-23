@@ -59,7 +59,7 @@ from mcp.shared._httpx_utils import create_mcp_http_client
 from mcp.types import TextContent
 from typing_extensions import Unpack
 
-from mcp_condenser.condenser import PROFILES, Heuristics, condense_json, toon_encode_json, stats, count_tokens, truncate_to_token_limit
+from mcp_condenser.condenser import PROFILES, Heuristics, condense_text, toon_encode, stats, count_tokens, truncate_to_token_limit
 from mcp_condenser.parsers import parse_input
 from mcp_condenser.config import ProxyConfig, ServerConfig
 from mcp_condenser.metrics import MetricsRecorder, NoopRecorder, create_recorder, timer
@@ -257,15 +257,15 @@ class CondenserMiddleware(Middleware):
 
         # 1. TOON_ONLY → direct TOON encoding
         if base_name in cfg.toon_only_tools:
-            condensed = toon_encode_json(data)
+            condensed = toon_encode(data)
             mode = "toon_only"
         # 2. CONDENSE (or *) → full pipeline
         elif cfg.tools is None or base_name in cfg.tools:
-            condensed = condense_json(data, heuristics=h)
+            condensed = condense_text(data, heuristics=h)
             mode = "condense"
         # 3. TOON_FALLBACK → direct TOON encoding
         elif cfg.toon_fallback:
-            condensed = toon_encode_json(data)
+            condensed = toon_encode(data)
             mode = "toon_fallback"
         # 4. No match
         else:
