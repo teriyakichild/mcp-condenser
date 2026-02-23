@@ -119,7 +119,7 @@ cat pods.yaml | uv run mcp-condenser
 Measured across Kubernetes, AWS, and database fixtures using
 `tiktoken/cl100k_base`:
 
-| Fixture | Domain | JSON tokens | TOON tokens | Reduction |
+| Fixture | Domain | Raw tokens | TOON tokens | Reduction |
 |---------|--------|-------------|-------------|-----------|
 | K8s 16-pod node | Kubernetes | 9,876 | 3,656 | **63.0%** |
 | K8s 6-pod node | Kubernetes | 15,285 | 5,919 | **61.3%** |
@@ -162,14 +162,14 @@ and multi-hop reasoning.
 ### Local models: context window enablement
 
 Small context windows (8K-64K) common with local models can't fit large API
-responses as raw JSON. TOON condensing brings them within reach.
+responses in raw form. TOON condensing brings them within reach.
 
-| Fixture | JSON tok | TOON tok | 8K | 16K | 32K | 64K | 128K |
+| Fixture | Raw tok | TOON tok | 8K | 16K | 32K | 64K | 128K |
 |---------|----------|----------|-----|-----|-----|-----|------|
-| K8s 16-pod node | 9,876 | 3,656 | Neither | **TOON only** | JSON + TOON | JSON + TOON | JSON + TOON |
-| K8s 6-pod node | 15,285 | 5,919 | Neither | Neither | **TOON only** | JSON + TOON | JSON + TOON |
-| EC2 instances | 33,498 | 4,386 | Neither | **TOON only** | **TOON only** | **TOON only** | JSON + TOON |
-| SQL orders | 26,165 | 11,298 | Neither | Neither | Neither | **TOON only** | JSON + TOON |
+| K8s 16-pod node | 9,876 | 3,656 | Neither | **TOON only** | Raw + TOON | Raw + TOON | Raw + TOON |
+| K8s 6-pod node | 15,285 | 5,919 | Neither | Neither | **TOON only** | Raw + TOON | Raw + TOON |
+| EC2 instances | 33,498 | 4,386 | Neither | **TOON only** | **TOON only** | **TOON only** | Raw + TOON |
+| SQL orders | 26,165 | 11,298 | Neither | Neither | Neither | **TOON only** | Raw + TOON |
 | K8s 30-pod node | 69,885 | 22,229 | Neither | Neither | Neither | Neither | **TOON only** |
 
 Run the token reduction tests (no Ollama required):
