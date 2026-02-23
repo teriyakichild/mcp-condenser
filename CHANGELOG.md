@@ -1,6 +1,54 @@
 # CHANGELOG
 
 
+## v0.7.0 (2026-02-23)
+
+### Bug Fixes
+
+- Update GitHub URLs from logdna to teriyakichild
+  ([`4613815`](https://github.com/teriyakichild/mcp-condenser/commit/46138158abac759e461ae42cf10cee2e3729004b))
+
+### Documentation
+
+- Add shields.io badges to README
+  ([`8890266`](https://github.com/teriyakichild/mcp-condenser/commit/8890266a0ec09c776a35b2ae354c8feffd35bdb5))
+
+- Update benchmark reports with balanced profile results
+  ([`ef06aa7`](https://github.com/teriyakichild/mcp-condenser/commit/ef06aa73aef3f2a6ac8dcd9679080d6935d65569))
+
+Rerun full accuracy matrix (5 models × 4 fixtures) using the balanced profile with TOON-only mode.
+  EC2 accuracy improved from 0% to 80-100% on qwen3 models thanks to wide_table_format=split.
+
+### Features
+
+- Add --profile and --toon-only flags to benchmark matrix
+  ([`c72ad7c`](https://github.com/teriyakichild/mcp-condenser/commit/c72ad7c03051c57ee63bf2c70fee1dd1f52ce76e))
+
+Support heuristics profiles and TOON-only mode in the matrix runner, passing resolved heuristics
+  through to token/context table generation. Back up pre-profile raw results for historical
+  comparison.
+
+- Add heuristics profiles (balanced, compact, precise)
+  ([`8eb8ba0`](https://github.com/teriyakichild/mcp-condenser/commit/8eb8ba01b85575d818b74d2024d26ca1e8f52b08))
+
+Named profiles provide preset heuristic configurations selectable via config, env var
+  (CONDENSER_PROFILE), or benchmark CLI (--profile). Resolution order: profile defaults → server
+  heuristics → tool_heuristics.
+
+- Add wide table rendering and per-tool heuristics
+  ([`05ff812`](https://github.com/teriyakichild/mcp-condenser/commit/05ff812678e93720355926a0ffa13ab153b3a819))
+
+Resolve merge conflicts from feat/wide-table-rendering branch. Adds two alternative renderers for
+  tables that exceed a column threshold:
+
+- vertical: key-value blocks per row, labeled by identity column - split: multiple narrow sub-tables
+  grouped by column prefix, with identity columns repeated in each
+
+New heuristics: wide_table_threshold (column count trigger), wide_table_format ("vertical" or
+  "split"). Per-tool heuristic overrides via tool_heuristics config. Expanded benchmark questions
+  for K8s fixtures.
+
+
 ## v0.6.0 (2026-02-23)
 
 ### Features
