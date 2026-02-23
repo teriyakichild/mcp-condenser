@@ -59,7 +59,8 @@ from mcp.shared._httpx_utils import create_mcp_http_client
 from mcp.types import TextContent
 from typing_extensions import Unpack
 
-from mcp_condenser.condenser import PROFILES, Heuristics, condense_json, toon_encode_json, stats, count_tokens, parse_input, truncate_to_token_limit
+from mcp_condenser.condenser import PROFILES, Heuristics, condense_json, toon_encode_json, stats, count_tokens, truncate_to_token_limit
+from mcp_condenser.parsers import parse_input
 from mcp_condenser.config import ProxyConfig, ServerConfig
 from mcp_condenser.metrics import MetricsRecorder, NoopRecorder, create_recorder, timer
 

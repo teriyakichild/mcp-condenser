@@ -1,5 +1,5 @@
 """
-condenser.py — JSON/YAML → compact TOON text for LLM consumption.
+condenser.py — structured text → compact TOON text for LLM consumption.
 
 Two-layer design:
   1. Preprocessing: flatten, detect homogeneous arrays, elide zero/null/constant
@@ -15,13 +15,14 @@ Usage:
 """
 
 import json, sys, re, argparse
-import yaml
 from dataclasses import dataclass
 from typing import Any
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timezone
 
 import toon_format
+
+from mcp_condenser.parsers import parse_input  # noqa: F401 — re-export
 
 
 @dataclass
@@ -70,33 +71,6 @@ except Exception:
     def count_tokens(text: str) -> int:
         return len(text) // 4
     TOKEN_METHOD = "len/4 estimate"
-
-
-# ── input parsing ─────────────────────────────────────────────────────────
-
-def parse_input(text: str) -> tuple[Any, str]:
-    """Parse text as JSON or YAML.
-
-    Returns (parsed_data, format_name).
-    Raises ValueError if neither format parses successfully.
-    """
-    # Try JSON first — it's stricter and faster
-    try:
-        return json.loads(text), "json"
-    except (json.JSONDecodeError, TypeError):
-        pass
-
-    # Fall back to YAML
-    try:
-        data = yaml.safe_load(text)
-        # yaml.safe_load returns str for plain scalars and None for empty —
-        # only accept dicts/lists as meaningful structured data
-        if isinstance(data, (dict, list)):
-            return data, "yaml"
-    except yaml.YAMLError:
-        pass
-
-    raise ValueError("Input is not valid JSON or YAML")
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
