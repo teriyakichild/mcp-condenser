@@ -270,6 +270,52 @@ class TestStringHeuristicsEnvParsing:
         assert srv.heuristics["elide_all_zero"] is True
 
 
+class TestProfileConfig:
+    def test_default_profile_is_balanced(self):
+        cfg = ServerConfig(url="http://localhost/mcp")
+        assert cfg.profile == "balanced"
+
+    def test_from_env_default_profile(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        monkeypatch.delenv("CONDENSER_PROFILE", raising=False)
+        config = ProxyConfig.from_env()
+        assert config.servers["default"].profile == "balanced"
+
+    def test_from_env_custom_profile(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        monkeypatch.setenv("CONDENSER_PROFILE", "compact")
+        config = ProxyConfig.from_env()
+        assert config.servers["default"].profile == "compact"
+
+    def test_from_file_default_profile(self, tmp_path):
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "servers": {"s": {"url": "http://localhost/mcp"}}
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        assert config.servers["s"].profile == "balanced"
+
+    def test_from_file_custom_profile(self, tmp_path):
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "servers": {"s": {"url": "http://localhost/mcp", "profile": "precise"}}
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        assert config.servers["s"].profile == "precise"
+
+    def test_from_file_per_server_profiles(self, tmp_path):
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "servers": {
+                "k8s": {"url": "http://k8s/mcp", "profile": "balanced"},
+                "aws": {"url": "http://aws/mcp", "profile": "precise"},
+            }
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        assert config.servers["k8s"].profile == "balanced"
+        assert config.servers["aws"].profile == "precise"
+
+
 class TestLoad:
     def test_prefers_config_file(self, tmp_path, monkeypatch):
         cfg_file = tmp_path / "config.json"

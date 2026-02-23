@@ -39,6 +39,27 @@ class Heuristics:
     wide_table_threshold: int = 0       # 0 = disabled; tables wider switch format
     wide_table_format: str = "vertical" # "vertical" or "split"
 
+
+PROFILES: dict[str, dict] = {
+    "balanced": {"wide_table_threshold": 20, "wide_table_format": "split"},
+    "compact": {"wide_table_threshold": 0, "elide_mostly_zero_pct": 0.8},
+    "precise": {"wide_table_threshold": 15, "wide_table_format": "split"},
+}
+
+
+def resolve_profile(name: str = "balanced", **overrides) -> Heuristics:
+    """Build a Heuristics instance from a named profile with optional overrides.
+
+    Args:
+        name: Profile name ("balanced", "compact", "precise").
+              Unknown names fall back to Heuristics defaults.
+        **overrides: Individual heuristic values that override the profile.
+    """
+    base = dict(PROFILES.get(name, {}))
+    base.update(overrides)
+    return Heuristics(**base)
+
+
 try:
     import tiktoken
     _enc = tiktoken.get_encoding("cl100k_base")

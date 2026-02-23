@@ -26,6 +26,7 @@ class ServerConfig:
     revert_if_larger: bool = False
     max_token_limit: int = 0
     tool_token_limits: dict[str, int] = field(default_factory=dict)
+    profile: str = "balanced"
     heuristics: dict[str, bool | int | float | str] = field(default_factory=dict)
     tool_heuristics: dict[str, dict[str, bool | int | float | str]] = field(default_factory=dict)
 
@@ -78,6 +79,8 @@ class ProxyConfig:
                     name, limit = pair.rsplit(":", 1)
                     tool_token_limits[name.strip()] = int(limit.strip())
 
+        profile = os.environ.get("CONDENSER_PROFILE", "balanced").strip()
+
         heuristics_env = os.environ.get("CONDENSER_HEURISTICS", "").strip()
         heuristics: dict[str, bool | int | float | str] = {}
         if heuristics_env:
@@ -120,6 +123,7 @@ class ProxyConfig:
             revert_if_larger=revert_if_larger,
             max_token_limit=max_token_limit,
             tool_token_limits=tool_token_limits,
+            profile=profile,
             heuristics=heuristics,
         )
         return cls(
@@ -155,6 +159,7 @@ class ProxyConfig:
 
             toon_only = srv.get("toon_only_tools", [])
             tool_token_limits = {k: int(v) for k, v in srv.get("tool_token_limits", {}).items()}
+            srv_profile = srv.get("profile", "balanced")
             srv_heuristics = srv.get("heuristics", {})
             srv_tool_heuristics = srv.get("tool_heuristics", {})
 
@@ -170,6 +175,7 @@ class ProxyConfig:
                 revert_if_larger=srv.get("revert_if_larger", False),
                 max_token_limit=srv.get("max_token_limit", 0),
                 tool_token_limits=tool_token_limits,
+                profile=srv_profile,
                 heuristics=srv_heuristics,
                 tool_heuristics=srv_tool_heuristics,
             )

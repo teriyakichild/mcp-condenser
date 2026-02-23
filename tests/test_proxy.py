@@ -404,6 +404,76 @@ class TestToolCollisionDetection:
         }
 
 
+class TestProfileHeuristicsMerge:
+    """Tests for profile → heuristics → tool_heuristics merge chain."""
+
+    def test_profile_defaults_applied(self):
+        """Balanced profile applies wide_table_threshold=20 by default."""
+        cfg = ServerConfig(
+            url="http://localhost/mcp",
+            profile="balanced",
+        )
+        mw = CondenserMiddleware(server_configs={"default": cfg})
+        # Build wide data that would trigger split rendering at threshold=20
+        rows = [{"name": f"item-{i}", **{f"col{j}": j for j in range(25)}} for i in range(3)]
+        data = json.dumps(rows)
+        result = mw._condense_item(data, "test_tool", cfg)
+        assert result is not None
+        condensed, _ = result
+        # With balanced profile (threshold=20, format=split), wide table should be split
+        assert "---" in condensed
+
+    def test_compact_profile_disables_wide_table(self):
+        """Compact profile has wide_table_threshold=0, no splitting."""
+        cfg = ServerConfig(
+            url="http://localhost/mcp",
+            profile="compact",
+        )
+        mw = CondenserMiddleware(server_configs={"default": cfg})
+        rows = [{"name": f"item-{i}", **{f"col{j}": j for j in range(25)}} for i in range(3)]
+        data = json.dumps(rows)
+        result = mw._condense_item(data, "test_tool", cfg)
+        assert result is not None
+        condensed, _ = result
+        # Compact profile has threshold=0 (disabled), so no split sub-tables
+        # It should be a single table block
+        assert "._misc" not in condensed
+
+    def test_server_heuristics_override_profile(self):
+        """Server-level heuristics override profile defaults."""
+        cfg = ServerConfig(
+            url="http://localhost/mcp",
+            profile="balanced",  # threshold=20
+            heuristics={"wide_table_threshold": 0},  # override to disable
+        )
+        mw = CondenserMiddleware(server_configs={"default": cfg})
+        rows = [{"name": f"item-{i}", **{f"col{j}": j for j in range(25)}} for i in range(3)]
+        data = json.dumps(rows)
+        result = mw._condense_item(data, "test_tool", cfg)
+        assert result is not None
+        condensed, _ = result
+        # Server override disabled wide table, no split sub-tables
+        assert "._misc" not in condensed
+
+    def test_tool_heuristics_override_server_and_profile(self):
+        """Tool-level heuristics override both profile and server."""
+        cfg = ServerConfig(
+            url="http://localhost/mcp",
+            profile="compact",  # threshold=0
+            heuristics={"wide_table_threshold": 0},  # also disabled
+            tool_heuristics={"test_tool": {"wide_table_threshold": 5, "wide_table_format": "split"}},
+        )
+        mw = CondenserMiddleware(server_configs={"default": cfg})
+        # Use varied data so columns aren't elided as constants
+        rows = [{"name": f"item-{i}", **{f"grp.col{j}": i * 10 + j for j in range(10)}} for i in range(3)]
+        data = json.dumps(rows)
+        result = mw._condense_item(data, "test_tool", cfg)
+        assert result is not None
+        condensed, _ = result
+        # Tool override sets threshold=5, format=split — columns > 5, should split
+        assert ".grp" in condensed
+
+
 class TestToolHeuristicsMerge:
     """Tests for per-tool heuristic overrides in _condense_item."""
 

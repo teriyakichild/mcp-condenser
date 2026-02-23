@@ -13,7 +13,7 @@ import sys
 import time
 from pathlib import Path
 
-from mcp_condenser.condenser import Heuristics, condense_json, count_tokens
+from mcp_condenser.condenser import PROFILES, Heuristics, condense_json, count_tokens
 
 from benchmarks.fixtures import (
     QUESTIONS,
@@ -594,6 +594,11 @@ def main():
         help="Path to JSONL failure log (default: benchmarks/failures.jsonl)",
     )
     parser.add_argument(
+        "--profile",
+        default="balanced",
+        help="Heuristics profile: balanced (default), compact, precise",
+    )
+    parser.add_argument(
         "--heuristics",
         default="",
         help="Heuristic overrides as key:val,key:val (e.g. max_table_columns:12,elide_mostly_zero_pct:0.8)",
@@ -601,7 +606,7 @@ def main():
 
     args = parser.parse_args()
 
-    # Parse heuristic overrides
+    # Parse heuristic overrides: profile defaults → --heuristics overrides
     heuristic_overrides: dict[str, bool | int | float | str] = {}
     if args.heuristics:
         for pair in args.heuristics.split(","):
@@ -619,8 +624,12 @@ def main():
                             heuristic_overrides[name.strip()] = val.lower() in ("true", "yes")
                         else:
                             heuristic_overrides[name.strip()] = val
-    args.heuristics_obj = Heuristics(**heuristic_overrides) if heuristic_overrides else None
-    args.heuristic_overrides = heuristic_overrides
+
+    # Merge: profile → explicit overrides
+    merged = dict(PROFILES.get(args.profile, {}))
+    merged.update(heuristic_overrides)
+    args.heuristics_obj = Heuristics(**merged) if merged else None
+    args.heuristic_overrides = merged
 
     results = run_benchmark(args)
 

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from mcp_condenser.condenser import Heuristics, condense_json, preprocess_table, render_table
+from mcp_condenser.condenser import PROFILES, Heuristics, condense_json, preprocess_table, render_table, resolve_profile
 from mcp_condenser.config import ServerConfig
 from mcp_condenser.proxy import CondenserMiddleware
 
@@ -557,3 +557,58 @@ class TestWideTableSplit:
         assert "[pod-a]" in vert_text
         # They should be different
         assert split_text != vert_text
+
+
+class TestProfiles:
+    """Tests for PROFILES dict and resolve_profile()."""
+
+    def test_profiles_dict_has_expected_keys(self):
+        assert set(PROFILES.keys()) == {"balanced", "compact", "precise"}
+
+    def test_balanced_profile_values(self):
+        assert PROFILES["balanced"]["wide_table_threshold"] == 20
+        assert PROFILES["balanced"]["wide_table_format"] == "split"
+
+    def test_compact_profile_values(self):
+        assert PROFILES["compact"]["wide_table_threshold"] == 0
+        assert PROFILES["compact"]["elide_mostly_zero_pct"] == 0.8
+
+    def test_precise_profile_values(self):
+        assert PROFILES["precise"]["wide_table_threshold"] == 15
+        assert PROFILES["precise"]["wide_table_format"] == "split"
+
+    def test_resolve_profile_balanced(self):
+        h = resolve_profile("balanced")
+        assert h.wide_table_threshold == 20
+        assert h.wide_table_format == "split"
+        # Non-overridden fields use Heuristics defaults
+        assert h.elide_all_zero is True
+
+    def test_resolve_profile_compact(self):
+        h = resolve_profile("compact")
+        assert h.wide_table_threshold == 0
+        assert h.elide_mostly_zero_pct == 0.8
+
+    def test_resolve_profile_precise(self):
+        h = resolve_profile("precise")
+        assert h.wide_table_threshold == 15
+        assert h.wide_table_format == "split"
+
+    def test_resolve_profile_with_overrides(self):
+        h = resolve_profile("balanced", wide_table_threshold=30)
+        assert h.wide_table_threshold == 30  # override wins
+        assert h.wide_table_format == "split"  # profile default preserved
+
+    def test_resolve_profile_unknown_falls_back_to_defaults(self):
+        h = resolve_profile("nonexistent")
+        assert h == Heuristics()
+
+    def test_resolve_profile_default_is_balanced(self):
+        h = resolve_profile()
+        assert h.wide_table_threshold == 20
+        assert h.wide_table_format == "split"
+
+    def test_profiles_are_partial(self):
+        """Each profile only overrides a few fields, not all."""
+        for name, overrides in PROFILES.items():
+            assert len(overrides) <= 3, f"Profile {name} has too many overrides"
