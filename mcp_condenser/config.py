@@ -29,6 +29,8 @@ class ServerConfig:
     profile: str = "balanced"
     heuristics: dict[str, bool | int | float | str] = field(default_factory=dict)
     tool_heuristics: dict[str, dict[str, bool | int | float | str]] = field(default_factory=dict)
+    format_hint: str | None = None
+    tool_format_hints: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -100,6 +102,16 @@ class ProxyConfig:
                             else:
                                 heuristics[name.strip()] = val
 
+        format_hint_env = os.environ.get("FORMAT_HINT", "").strip() or None
+        tool_format_hints_env = os.environ.get("TOOL_FORMAT_HINTS", "").strip()
+        tool_format_hints: dict[str, str] = {}
+        if tool_format_hints_env:
+            for pair in tool_format_hints_env.split(","):
+                pair = pair.strip()
+                if ":" in pair:
+                    name, fmt = pair.rsplit(":", 1)
+                    tool_format_hints[name.strip()] = fmt.strip()
+
         host = os.environ.get("PROXY_HOST", "0.0.0.0")
         port = int(os.environ.get("PROXY_PORT", "9000"))
 
@@ -125,6 +137,8 @@ class ProxyConfig:
             tool_token_limits=tool_token_limits,
             profile=profile,
             heuristics=heuristics,
+            format_hint=format_hint_env,
+            tool_format_hints=tool_format_hints,
         )
         return cls(
             servers={"default": server},
@@ -162,6 +176,8 @@ class ProxyConfig:
             srv_profile = srv.get("profile", "balanced")
             srv_heuristics = srv.get("heuristics", {})
             srv_tool_heuristics = srv.get("tool_heuristics", {})
+            srv_format_hint = srv.get("format_hint", None)
+            srv_tool_format_hints = srv.get("tool_format_hints", {})
 
             servers[name] = ServerConfig(
                 url=srv["url"],
@@ -178,6 +194,8 @@ class ProxyConfig:
                 profile=srv_profile,
                 heuristics=srv_heuristics,
                 tool_heuristics=srv_tool_heuristics,
+                format_hint=srv_format_hint,
+                tool_format_hints=srv_tool_format_hints,
             )
 
         return cls(

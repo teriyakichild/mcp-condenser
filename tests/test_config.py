@@ -316,6 +316,57 @@ class TestProfileConfig:
         assert config.servers["aws"].profile == "precise"
 
 
+class TestFormatHintConfig:
+    def test_default_is_none(self):
+        cfg = ServerConfig(url="http://localhost/mcp")
+        assert cfg.format_hint is None
+        assert cfg.tool_format_hints == {}
+
+    def test_from_env_format_hint(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        monkeypatch.setenv("FORMAT_HINT", "yaml")
+        config = ProxyConfig.from_env()
+        assert config.servers["default"].format_hint == "yaml"
+
+    def test_from_env_tool_format_hints(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        monkeypatch.setenv("TOOL_FORMAT_HINTS", "get_logs:csv,get_config:yaml")
+        config = ProxyConfig.from_env()
+        srv = config.servers["default"]
+        assert srv.tool_format_hints == {"get_logs": "csv", "get_config": "yaml"}
+
+    def test_from_env_empty_defaults(self, monkeypatch):
+        monkeypatch.setenv("UPSTREAM_MCP_URL", "http://localhost/mcp")
+        config = ProxyConfig.from_env()
+        assert config.servers["default"].format_hint is None
+        assert config.servers["default"].tool_format_hints == {}
+
+    def test_from_file_format_hint(self, tmp_path):
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "servers": {
+                "s": {
+                    "url": "http://localhost/mcp",
+                    "format_hint": "csv",
+                    "tool_format_hints": {"get_data": "json"},
+                }
+            }
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        srv = config.servers["s"]
+        assert srv.format_hint == "csv"
+        assert srv.tool_format_hints == {"get_data": "json"}
+
+    def test_from_file_defaults(self, tmp_path):
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "servers": {"s": {"url": "http://localhost/mcp"}}
+        }))
+        config = ProxyConfig.from_file(str(cfg_file))
+        assert config.servers["s"].format_hint is None
+        assert config.servers["s"].tool_format_hints == {}
+
+
 class TestLoad:
     def test_prefers_config_file(self, tmp_path, monkeypatch):
         cfg_file = tmp_path / "config.json"

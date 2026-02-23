@@ -217,9 +217,13 @@ class CondenserMiddleware(Middleware):
         Returns (condensed_text, mode) or None if no condensing was applied.
         """
         server_name = self._resolve_server_name(tool_name)
+        base_name = self._base_tool_name(tool_name)
+
+        # Resolve format hint: per-tool override takes precedence
+        hint = cfg.tool_format_hints.get(base_name, cfg.format_hint)
 
         try:
-            data, input_fmt = parse_input(text)
+            data, input_fmt = parse_input(text, format_hint=hint)
         except ValueError:
             self.metrics.record_request(tool_name, server_name, "passthrough")
             return None
@@ -236,8 +240,6 @@ class CondenserMiddleware(Middleware):
             )
             self.metrics.record_request(tool_name, server_name, "skipped")
             return None
-
-        base_name = self._base_tool_name(tool_name)
 
         # Build heuristics: profile defaults → server overrides → tool overrides
         merged = dict(PROFILES.get(cfg.profile, {}))

@@ -533,3 +533,49 @@ class TestToolHeuristicsMerge:
         condensed, _ = result
         # Tool override sets elide_timestamps=False, so timestamps should appear
         assert "2024-01-01T00:00:00Z" in condensed
+
+
+class TestFormatHintFlow:
+    """Verify format_hint flows from config through _condense_item to parse_input."""
+
+    def test_server_format_hint(self):
+        """Server-level format_hint is passed to parse_input."""
+        cfg = ServerConfig(
+            url="http://localhost/mcp",
+            format_hint="json",
+        )
+        mw = CondenserMiddleware(server_configs={"default": cfg})
+        text = json.dumps({"name": "test", "value": 42})
+        result = mw._condense_item(text, "test_tool", cfg)
+        assert result is not None
+        condensed, mode = result
+        assert mode == "condense"
+        assert "test" in condensed
+
+    def test_tool_format_hint_overrides_server(self):
+        """Per-tool format_hint takes precedence over server-level."""
+        cfg = ServerConfig(
+            url="http://localhost/mcp",
+            format_hint="yaml",
+            tool_format_hints={"get_data": "json"},
+        )
+        mw = CondenserMiddleware(server_configs={"default": cfg})
+        text = json.dumps({"name": "test", "value": 42})
+        result = mw._condense_item(text, "get_data", cfg)
+        assert result is not None
+        condensed, mode = result
+        assert mode == "condense"
+        assert "test" in condensed
+
+    def test_yaml_hint_parses_yaml(self):
+        """YAML text with yaml hint is parsed correctly."""
+        cfg = ServerConfig(
+            url="http://localhost/mcp",
+            tool_format_hints={"get_config": "yaml"},
+        )
+        mw = CondenserMiddleware(server_configs={"default": cfg})
+        text = "name: test\nvalue: 42\n"
+        result = mw._condense_item(text, "get_config", cfg)
+        assert result is not None
+        condensed, _ = result
+        assert "test" in condensed
