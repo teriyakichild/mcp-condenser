@@ -9,10 +9,11 @@ RUN uv sync --frozen --no-install-project
 
 COPY README.md ./
 COPY mcp_condenser/ mcp_condenser/
+RUN uv sync --frozen
 
 ENV PROXY_HOST=0.0.0.0
 ENV PROXY_PORT=9000
 EXPOSE 9000
 EXPOSE 9090
 
-ENTRYPOINT ["uv", "run", "mcp-condenser-proxy"]
+ENTRYPOINT [".venv/bin/mcp-condenser-proxy"]
