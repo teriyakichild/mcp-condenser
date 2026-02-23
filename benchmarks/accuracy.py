@@ -60,21 +60,6 @@ def ask_ollama(model: str, context: str, question: str, host: str = "http://loca
 
 
 # ---------------------------------------------------------------------------
-# Fixture loader
-# ---------------------------------------------------------------------------
-
-def load_sample(fixtures_dir: Path, filename: str):
-    """Load a fixture file, unwrapping {"result": "<json>"} envelope if present."""
-    raw = (fixtures_dir / filename).read_text()
-    data = json.loads(raw)
-    if isinstance(data, dict) and set(data.keys()) == {"result"} and isinstance(data["result"], str):
-        inner = data["result"]
-        data = json.loads(inner)
-        raw = inner
-    return raw, data
-
-
-# ---------------------------------------------------------------------------
 # Match functions
 # ---------------------------------------------------------------------------
 

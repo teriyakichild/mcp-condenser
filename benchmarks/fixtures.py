@@ -4,14 +4,29 @@ import json
 import re
 from pathlib import Path
 
+from mcp_condenser.parsers import parse_input
+
 
 # ---------------------------------------------------------------------------
 # Fixture loader
 # ---------------------------------------------------------------------------
 
 def load_sample(fixtures_dir: Path, filename: str):
-    """Load a fixture file, unwrapping {"result": "<json>"} envelope if present."""
+    """Load a fixture file, returning (raw_text, parsed_data).
+
+    JSON files get special handling for the ``{"result": "<json>"}`` envelope
+    used by some MCP tool responses.  CSV and XML files are parsed via the
+    parser registry.
+    """
     raw = (fixtures_dir / filename).read_text()
+    ext = Path(filename).suffix.lower()
+
+    if ext in (".csv", ".xml"):
+        hint = ext.lstrip(".")
+        data, _ = parse_input(raw, format_hint=hint)
+        return raw, data
+
+    # JSON (default) — with envelope unwrapping
     data = json.loads(raw)
     if isinstance(data, dict) and set(data.keys()) == {"result"} and isinstance(data["result"], str):
         inner = data["result"]
@@ -76,6 +91,16 @@ FIXTURE_METADATA: dict[str, dict] = {
         "domain": "Database",
         "label": "SQL orders",
         "description": "SQL query result set — 150 order rows x 17 columns",
+    },
+    "server_metrics.csv": {
+        "domain": "Infrastructure",
+        "label": "Server metrics CSV",
+        "description": "Server monitoring report — 25 servers x 10 columns (CSV format)",
+    },
+    "deploy_inventory.xml": {
+        "domain": "DevOps",
+        "label": "Deploy inventory XML",
+        "description": "Deployment inventory — 20 deployments across 3 environments (XML format)",
     },
 }
 
@@ -558,6 +583,168 @@ QUESTIONS: dict[str, list[tuple[str, str, callable]]] = {
         (
             "How many orders are in the 'northeast' region?",
             "34",
+            contains_or_numeric,
+        ),
+    ],
+    "server_metrics.csv": [
+        # --- direct lookups ---
+        (
+            "How many servers are in the data set?",
+            "25",
+            contains_or_numeric,
+        ),
+        (
+            "How many servers have status 'running'?",
+            "19",
+            contains_or_numeric,
+        ),
+        (
+            "How many servers have status 'offline'?",
+            "3",
+            contains_or_numeric,
+        ),
+        (
+            "How many servers have status 'degraded'?",
+            "3",
+            contains_or_numeric,
+        ),
+        (
+            "How many unique regions are there?",
+            "3",
+            contains_or_numeric,
+        ),
+        # --- filtering, counting ---
+        (
+            "How many servers are in the 'us-east' region?",
+            "13",
+            contains_or_numeric,
+        ),
+        (
+            "How many servers run 'ubuntu'?",
+            "13",
+            contains_or_numeric,
+        ),
+        (
+            "How many servers are in the 'eu-west' region?",
+            "6",
+            contains_or_numeric,
+        ),
+        (
+            "How many servers have service_count of 5?",
+            "5",
+            contains_or_numeric,
+        ),
+        (
+            "How many 'centos' servers have status 'running'?",
+            "4",
+            contains_or_numeric,
+        ),
+        # --- cross-reference, extremes ---
+        (
+            "Which server has the highest cpu_pct? Give the hostname only.",
+            "batch-prod-01",
+            contains,
+        ),
+        (
+            "Which server has the highest memory_pct? Give the hostname only.",
+            "cache-prod-01",
+            contains,
+        ),
+        (
+            "Which server has the highest disk_pct? Give the hostname only.",
+            "log-prod-01",
+            contains,
+        ),
+        (
+            "What is the status of server 'batch-prod-02'?",
+            "offline",
+            contains,
+        ),
+        # --- multi-hop ---
+        (
+            "How many servers in the 'us-east' region have status 'running'?",
+            "10",
+            contains_or_numeric,
+        ),
+    ],
+    "deploy_inventory.xml": [
+        # --- direct lookups ---
+        (
+            "How many deployments are listed in total?",
+            "20",
+            contains_or_numeric,
+        ),
+        (
+            "How many deployments are in the 'production' environment?",
+            "11",
+            contains_or_numeric,
+        ),
+        (
+            "How many deployments are in the 'staging' environment?",
+            "6",
+            contains_or_numeric,
+        ),
+        (
+            "How many deployments have status 'healthy'?",
+            "17",
+            contains_or_numeric,
+        ),
+        (
+            "How many unique services are deployed?",
+            "11",
+            contains_or_numeric,
+        ),
+        # --- filtering, counting ---
+        (
+            "How many deployments have status 'failing'?",
+            "2",
+            contains_or_numeric,
+        ),
+        (
+            "How many deployments are in the 'us-west-2' region?",
+            "10",
+            contains_or_numeric,
+        ),
+        (
+            "How many deployments belong to the 'commerce' team?",
+            "6",
+            contains_or_numeric,
+        ),
+        (
+            "How many deployments belong to the 'platform' team?",
+            "8",
+            contains_or_numeric,
+        ),
+        (
+            "How many production deployments are in the 'us-east-1' region?",
+            "8",
+            contains_or_numeric,
+        ),
+        # --- cross-reference, extremes ---
+        (
+            "Which service has the most replicas? Give the service name only.",
+            "cache-service",
+            contains,
+        ),
+        (
+            "Which service has the highest memory_limit? Give the service name only.",
+            "cache-service",
+            contains,
+        ),
+        (
+            "What is the version of 'api-gateway' in the staging environment?",
+            "2.5.0",
+            contains,
+        ),
+        (
+            "What is the cpu_limit of the production 'search-service' deployment?",
+            "1000",
+            contains_or_numeric,
+        ),
+        # --- multi-hop ---
+        (
+            "How many production deployments have status 'healthy'?",
+            "10",
             contains_or_numeric,
         ),
     ],

@@ -34,6 +34,8 @@ DEFAULT_FIXTURES = [
     "toolresult2_small.json",
     "aws_ec2_instances.json",
     "db_query_results.json",
+    "server_metrics.csv",
+    "deploy_inventory.xml",
 ]
 
 LARGE_FIXTURES = [
