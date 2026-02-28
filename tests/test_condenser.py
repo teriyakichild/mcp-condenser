@@ -5,7 +5,7 @@ from collections import OrderedDict
 
 import pytest
 
-from mcp_condenser.condenser import classify, flatten, find_identity_column, is_homogeneous_array, is_kv_array, pivot_kv_fields, condense_text, toon_encode, condense_json, toon_encode_json, truncate_to_token_limit, count_tokens
+from mcp_condenser.condenser import classify, flatten, fmt, find_identity_column, is_homogeneous_array, is_kv_array, pivot_kv_fields, condense_text, toon_encode, condense_json, toon_encode_json, truncate_to_token_limit, count_tokens
 from mcp_condenser.parsers import parse_input
 
 
@@ -24,6 +24,44 @@ class TestClassify:
 
     def test_unknown(self):
         assert classify(object()) == "unknown"
+
+
+class TestFmt:
+    def test_none(self):
+        assert fmt(None) == ""
+
+    def test_bool(self):
+        assert fmt(True) == "true"
+        assert fmt(False) == "false"
+
+    def test_int(self):
+        assert fmt(42) == "42"
+
+    def test_string(self):
+        assert fmt("hello") == "hello"
+
+    def test_float_whole_number(self):
+        assert fmt(3.0) == "3"
+
+    def test_float_fractional(self):
+        assert fmt(3.14) == "3.14"
+
+    def test_float_at_safe_boundary(self):
+        """2**53 is the largest exactly-representable integer in float64."""
+        assert fmt(float(2**53)) == str(2**53)
+
+    def test_float_above_safe_boundary(self):
+        """Above 2**53, float-to-int conversion can lose precision."""
+        large = float(2**54)
+        # Should NOT convert to int — fall through to str(val)
+        assert fmt(large) == str(large)
+
+    def test_float_inf(self):
+        assert fmt(float("inf")) == "inf"
+        assert fmt(float("-inf")) == "-inf"
+
+    def test_float_nan(self):
+        assert fmt(float("nan")) == "nan"
 
 
 class TestFlatten:

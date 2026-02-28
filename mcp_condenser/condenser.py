@@ -14,7 +14,7 @@ Usage:
     python condenser.py input.json -o out.txt -q
 """
 
-import json, sys, re, argparse, warnings
+import json, math, sys, re, argparse, warnings
 from dataclasses import dataclass
 from typing import Any
 from collections import OrderedDict, defaultdict
@@ -100,7 +100,7 @@ def flatten(obj: dict, pfx: str = "") -> OrderedDict:
 def fmt(val: Any) -> str:
     if val is None: return ""
     if isinstance(val, bool): return str(val).lower()
-    if isinstance(val, float) and val == int(val) and abs(val) < 2**53: return str(int(val))
+    if isinstance(val, float) and math.isfinite(val) and val.is_integer() and abs(val) <= 2**53: return str(int(val))
     return str(val)
 
 
