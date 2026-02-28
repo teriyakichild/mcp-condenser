@@ -1,0 +1,64 @@
+name: Prerelease
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.issue.pull_request &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+       github.event.comment.body == '/prerelease')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || github.ref }}
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - run: uv sync
+
+      - run: uv run pytest tests/ -v
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || github.ref }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: teriyakichild
+          password: ${{ secrets.DOCKERHUB_SECRET }}
+
+      - name: Generate tags
+        id: tags
+        run: |
+          SHA_SHORT=$(git rev-parse --short HEAD)
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            echo "tags=teriyakichild/mcp-condenser:pr-${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+          else
+            BRANCH=$(echo "${{ github.ref_name }}" | sed 's|/|-|g')
+            echo "tags=teriyakichild/mcp-condenser:${BRANCH}-${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
