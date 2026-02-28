@@ -100,7 +100,7 @@ def flatten(obj: dict, pfx: str = "") -> OrderedDict:
 def fmt(val: Any) -> str:
     if val is None: return ""
     if isinstance(val, bool): return str(val).lower()
-    if isinstance(val, float) and val == int(val): return str(int(val))
+    if isinstance(val, float) and val == int(val) and abs(val) < 2**53: return str(int(val))
     return str(val)
 
 
@@ -302,27 +302,6 @@ def order_columns(cols: list[str]) -> list[str]:
 
 # ── preprocessing + TOON rendering ──────────────────────────────────────────
 
-def extract_array_fields(arr: list, cols: list[str]) -> tuple[list[str], dict]:
-    """Find array-valued fields in items, return (remaining_cols, extracted).
-    extracted maps field_name -> list of (parent_id, sub_items)."""
-    array_cols = set()
-    for item in arr:
-        fl = flatten(item)
-        for k, v in fl.items():
-            if isinstance(v, list):
-                array_cols.add(k)
-
-    # also check non-flattened arrays at top level of each item
-    for item in arr:
-        for k, v in item.items():
-            if isinstance(v, list):
-                # flatten won't nest into arrays, but we may have top-level arrays
-                pass  # already caught by flatten
-
-    remaining = [c for c in cols if c not in array_cols]
-    return remaining, array_cols
-
-
 def preprocess_table(name: str, arr: list, heuristics: Heuristics | None = None) -> tuple[list[str], list[dict], list[tuple[str, list[str]]]]:
     """Analyze and clean a homogeneous array.
 
@@ -449,12 +428,7 @@ def preprocess_table(name: str, arr: list, heuristics: Heuristics | None = None)
         for header, srcs in final:
             if len(srcs) == 1:
                 val = fl.get(srcs[0])
-                if val is None:
-                    row[header] = ""
-                elif isinstance(val, bool):
-                    row[header] = val
-                else:
-                    row[header] = val
+                row[header] = "" if val is None else val
             else:
                 # tuple: join as comma-separated string
                 row[header] = ",".join(fmt(fl.get(s)) for s in srcs)

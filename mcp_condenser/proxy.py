@@ -42,6 +42,7 @@ Usage:
 
 import contextlib
 import datetime
+import logging
 import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -63,6 +64,8 @@ from mcp_condenser.condenser import PROFILES, Heuristics, condense_text, toon_en
 from mcp_condenser.parsers import parse_input
 from mcp_condenser.config import ProxyConfig, ServerConfig
 from mcp_condenser.metrics import MetricsRecorder, NoopRecorder, create_recorder, timer
+
+logger = logging.getLogger("mcp_condenser")
 
 
 class _ForwardingTransport(StreamableHttpTransport):
@@ -232,11 +235,9 @@ class CondenserMiddleware(Middleware):
 
         # Check minimum token threshold
         if cfg.min_token_threshold > 0 and orig_tokens < cfg.min_token_threshold:
-            print(
-                f"[condenser] {tool_name}: skipped — "
-                f"{orig_tokens:,} tokens below threshold "
-                f"({cfg.min_token_threshold:,})",
-                file=sys.stderr,
+            logger.info(
+                "tool=%s action=skipped tokens=%d threshold=%d",
+                tool_name, orig_tokens, cfg.min_token_threshold,
             )
             self.metrics.record_request(tool_name, server_name, "skipped")
             return None
@@ -278,20 +279,16 @@ class CondenserMiddleware(Middleware):
 
         # Revert if condensed is larger
         if cfg.revert_if_larger and s["cond_tok"] >= s["orig_tok"]:
-            print(
-                f"[condenser] {tool_name} ({mode}): reverted — "
-                f"condensed {s['cond_tok']:,} tokens >= "
-                f"original {s['orig_tok']:,} tokens",
-                file=sys.stderr,
+            logger.info(
+                "tool=%s mode=%s action=reverted condensed_tokens=%d original_tokens=%d",
+                tool_name, mode, s["cond_tok"], s["orig_tok"],
             )
             self.metrics.record_request(tool_name, server_name, "reverted")
             return None
 
-        print(
-            f"[condenser] {tool_name} ({mode}, {input_fmt}): "
-            f"{s['orig_tok']:,}→{s['cond_tok']:,} tokens "
-            f"({s['tok_pct']}% reduction)",
-            file=sys.stderr,
+        logger.info(
+            "tool=%s mode=%s format=%s input_tokens=%d output_tokens=%d reduction_pct=%.1f",
+            tool_name, mode, input_fmt, s["orig_tok"], s["cond_tok"], s["tok_pct"],
         )
 
         self.metrics.record_request(tool_name, server_name, mode)
@@ -351,16 +348,20 @@ class CondenserMiddleware(Middleware):
                 if truncated is not item.text:
                     item.text = truncated
                     self.metrics.record_truncation(tool_name, server_name)
-                    print(
-                        f"[condenser] {tool_name}: truncated to "
-                        f"{effective_limit} token limit",
-                        file=sys.stderr,
+                    logger.info(
+                        "tool=%s action=truncated token_limit=%d",
+                        tool_name, effective_limit,
                     )
 
         return result
 
 
 def main():
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        level=logging.INFO,
+        stream=sys.stderr,
+    )
     config = ProxyConfig.load()
     metrics = create_recorder(enabled=config.metrics_enabled, port=config.metrics_port)
 
@@ -383,18 +384,17 @@ def _run_single_upstream(config: ProxyConfig, metrics: MetricsRecorder):
     condense_tools_desc = "*" if srv_cfg.tools is None else ",".join(srv_cfg.tools)
     toon_only_desc = ",".join(srv_cfg.toon_only_tools) or "(none)"
 
-    print(f"MCP condenser proxy starting on {config.host}:{config.port}", file=sys.stderr)
-    print(f"  upstream: {srv_cfg.url}", file=sys.stderr)
-    print(f"  condensing: {condense_tools_desc}", file=sys.stderr)
-    print(f"  toon-only: {toon_only_desc}", file=sys.stderr)
-    print(f"  toon-fallback: {srv_cfg.toon_fallback}", file=sys.stderr)
-    print(f"  min-token-threshold: {srv_cfg.min_token_threshold or 'off'}", file=sys.stderr)
-    print(f"  revert-if-larger: {srv_cfg.revert_if_larger}", file=sys.stderr)
-    print(f"  max-token-limit: {srv_cfg.max_token_limit or 'off'}", file=sys.stderr)
     ttl_desc = ",".join(f"{k}:{v}" for k, v in srv_cfg.tool_token_limits.items()) or "(none)"
-    print(f"  tool-token-limits: {ttl_desc}", file=sys.stderr)
-    if config.metrics_enabled:
-        print(f"  metrics: http://0.0.0.0:{config.metrics_port}/metrics", file=sys.stderr)
+    logger.info(
+        "starting host=%s port=%d upstream=%s condensing=%s toon_only=%s "
+        "toon_fallback=%s min_token_threshold=%s revert_if_larger=%s "
+        "max_token_limit=%s tool_token_limits=%s metrics=%s",
+        config.host, config.port, srv_cfg.url, condense_tools_desc,
+        toon_only_desc, srv_cfg.toon_fallback,
+        srv_cfg.min_token_threshold or "off", srv_cfg.revert_if_larger,
+        srv_cfg.max_token_limit or "off", ttl_desc,
+        f"http://0.0.0.0:{config.metrics_port}/metrics" if config.metrics_enabled else "off",
+    )
 
     proxy.run(transport="streamable-http", host=config.host, port=config.port)
 
@@ -439,9 +439,9 @@ def _run_multi_upstream(config: ProxyConfig, metrics: MetricsRecorder):
                 server.add_tool(proxy_tool)
                 tool_server_map[registered_name] = server_name
 
-                print(
-                    f"  registered: {registered_name} (from {server_name})",
-                    file=sys.stderr,
+                logger.info(
+                    "registered tool=%s server=%s",
+                    registered_name, server_name,
                 )
 
         yield
@@ -456,14 +456,17 @@ def _run_multi_upstream(config: ProxyConfig, metrics: MetricsRecorder):
         metrics=metrics,
     ))
 
-    print(f"MCP condenser proxy starting on {config.host}:{config.port}", file=sys.stderr)
-    print(f"  mode: multi-upstream ({len(config.servers)} servers)", file=sys.stderr)
-    print(f"  prefix-tools: {config.prefix_tools}", file=sys.stderr)
+    logger.info(
+        "starting host=%s port=%d mode=multi-upstream servers=%d prefix_tools=%s metrics=%s",
+        config.host, config.port, len(config.servers), config.prefix_tools,
+        f"http://0.0.0.0:{config.metrics_port}/metrics" if config.metrics_enabled else "off",
+    )
     for name, srv_cfg in config.servers.items():
         tools_desc = "*" if srv_cfg.tools is None else ",".join(srv_cfg.tools)
-        print(f"  [{name}] {srv_cfg.url} — tools: {tools_desc}, condense: {srv_cfg.condense}", file=sys.stderr)
-    if config.metrics_enabled:
-        print(f"  metrics: http://0.0.0.0:{config.metrics_port}/metrics", file=sys.stderr)
+        logger.info(
+            "server=%s url=%s tools=%s condense=%s",
+            name, srv_cfg.url, tools_desc, srv_cfg.condense,
+        )
 
     app.run(transport="streamable-http", host=config.host, port=config.port)
 
