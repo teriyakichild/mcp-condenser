@@ -104,8 +104,11 @@ def fmt(val: Any) -> str:
     return str(val)
 
 
+_ISO_TS_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
+
+
 def is_iso_ts(s: str) -> bool:
-    return isinstance(s, str) and re.match(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", s) is not None
+    return isinstance(s, str) and _ISO_TS_RE.match(s) is not None
 
 
 def parse_ts(s: str) -> datetime | None:
