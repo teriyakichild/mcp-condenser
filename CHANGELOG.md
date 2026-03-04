@@ -1,6 +1,45 @@
 # CHANGELOG
 
 
+## v0.8.1 (2026-03-04)
+
+### Bug Fixes
+
+- Use isfinite/is_integer guard in fmt(), add edge-case tests
+  ([`041687d`](https://github.com/teriyakichild/mcp-condenser/commit/041687d50d2bd3e294f7b2638eac92e09e3b6e61))
+
+Address Copilot review feedback: - Use math.isfinite() + val.is_integer() instead of val == int(val)
+  to avoid OverflowError/ValueError on inf/nan before the magnitude check - Use <= 2**53 to include
+  the largest exactly-representable integer - Add TestFmt covering None, bool, int, string, whole
+  floats, fractional floats, boundary values (2**53, 2**54), inf, and nan
+
+### Continuous Integration
+
+- Add prerelease workflow for testing docker images
+  ([`d781660`](https://github.com/teriyakichild/mcp-condenser/commit/d7816602ffaf88608757a50c35860ecc426a2cb7))
+
+Triggered by maintainers commenting /prerelease on a PR, or via workflow_dispatch. Builds and pushes
+  images tagged as pr-<number> to DockerHub. Restricted to OWNER/MEMBER/COLLABORATOR roles.
+
+### Performance Improvements
+
+- Pre-compile is_iso_ts regex at module level
+  ([`bdb4218`](https://github.com/teriyakichild/mcp-condenser/commit/bdb421899ca14b8b90bb705136c0f8e6b3378f97))
+
+Moves the ISO timestamp regex from inline re.match() to a module-level compiled pattern. Benchmarks
+  show ~2x speedup (3.3M → 6.9M calls/s), which matters since is_iso_ts is called per-value in
+  timestamp columns.
+
+### Refactoring
+
+- Remove dead code, fix float precision, replace print with logging
+  ([`3122b6d`](https://github.com/teriyakichild/mcp-condenser/commit/3122b6dbbe36ff7a0332f16b301174b67650977e))
+
+- Remove unused extract_array_fields function and its no-op loop - Simplify redundant None/bool
+  branching in preprocess_table row builder - Guard fmt() float-to-int conversion with abs(val) <
+  2**53 for large floats - Replace all print(stderr) calls in proxy.py with structured logging
+
+
 ## v0.8.0 (2026-02-23)
 
 ### Bug Fixes
