@@ -547,6 +547,52 @@ def render_split(name: str, arr: list, annotations: list[str], cleaned_rows: lis
     return "\n".join(parts)
 
 
+def _inline_nested_array(arr_val: list) -> str | None:
+    """Try to render a small nested array as a compact inline string.
+
+    Returns a compact string like ``name:val,name:val`` for small arrays of
+    simple dicts, or None if the array is too complex to inline.
+    """
+    MAX_INLINE_ITEMS = 10
+    if not arr_val or not isinstance(arr_val, list):
+        return None
+    if len(arr_val) > MAX_INLINE_ITEMS:
+        return None
+    # All items must be simple dicts (no nested dicts/lists)
+    for item in arr_val:
+        if not isinstance(item, dict):
+            return None
+        for v in item.values():
+            if isinstance(v, (dict, list)):
+                return None
+    # Find a "key" column (name/id/key/label) and value columns
+    if not arr_val:
+        return None
+    sample_keys = list(arr_val[0].keys())
+    if len(sample_keys) < 2 or len(sample_keys) > 4:
+        return None
+    key_col = None
+    for kw in ("name", "key", "label", "id"):
+        for k in sample_keys:
+            if k.lower() == kw:
+                key_col = k
+                break
+        if key_col:
+            break
+    if not key_col:
+        return None
+    val_cols = [k for k in sample_keys if k != key_col]
+    parts = []
+    for item in arr_val:
+        k = fmt(item.get(key_col, ""))
+        if len(val_cols) == 1:
+            parts.append(f"{k}:{fmt(item.get(val_cols[0], ''))}")
+        else:
+            vals = ",".join(fmt(item.get(vc, "")) for vc in val_cols)
+            parts.append(f"{k}({vals})")
+    return " ".join(parts)
+
+
 def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> list[str]:
     """Render a homogeneous array as TOON table block(s).
 
@@ -571,6 +617,26 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
         for k, v in fl.items():
             if isinstance(v, list):
                 array_fields.add(k)
+
+    # Try to inline small nested arrays into parent rows as compact strings
+    inlined_fields = set()
+    for af in sorted(array_fields):
+        can_inline = True
+        for fl in all_flat:
+            arr_val = fl.get(af, [])
+            if isinstance(arr_val, list) and arr_val:
+                if _inline_nested_array(arr_val) is None:
+                    can_inline = False
+                    break
+        if can_inline:
+            for fl in all_flat:
+                arr_val = fl.get(af, [])
+                if isinstance(arr_val, list) and arr_val:
+                    fl[af] = _inline_nested_array(arr_val)
+                else:
+                    fl[af] = ""
+            inlined_fields.add(af)
+    array_fields -= inlined_fields
 
     # Determine parent identity column for back-references
     scalar_cols = order_columns(union_columns(all_flat))

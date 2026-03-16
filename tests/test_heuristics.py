@@ -355,13 +355,15 @@ class TestPivotKeyValueToggle:
         # No sub-table for Tags
         assert "Instances.Tags" not in text
 
-    def test_disabled_extracts_as_subtable(self):
+    def test_disabled_inlines_small_kv_arrays(self):
         rows = self._make_tagged_rows()
         blocks = render_table("Instances", rows, Heuristics(pivot_key_value=False))
         text = "\n".join(blocks)
-        # Should have a sub-table for Tags
-        assert "Instances.Tags" in text
-        # Pivoted columns should NOT appear
+        # Small KV arrays should be inlined as compact "Key:Value" strings
+        assert "Name:web" in text
+        assert "Env:prod" in text
+        # No sub-table or pivoted columns
+        assert "Instances.Tags" not in text
         assert "Tags.Name" not in text
         assert "Tags.Env" not in text
 
