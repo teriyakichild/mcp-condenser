@@ -638,6 +638,11 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
         if can_inline:
             for i, rendered in cached:
                 all_flat[i][af] = rendered
+            # Normalize any remaining empty lists to "" so they don't
+            # serialize as [] in the parent table.
+            for fl in all_flat:
+                if isinstance(fl.get(af), list) and not fl[af]:
+                    fl[af] = ""
             inlined_fields.add(af)
     array_fields -= inlined_fields
 
