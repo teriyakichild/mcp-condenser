@@ -1,6 +1,50 @@
 # CHANGELOG
 
 
+## v0.8.2 (2026-03-16)
+
+### Bug Fixes
+
+- Address review feedback on inline nested arrays
+  ([`5740d3f`](https://github.com/teriyakichild/mcp-condenser/commit/5740d3fa870479c96848b4ddfa046ca8cf2a3ef7))
+
+- Fix docstring to match actual output format (space-separated, not comma) - Cache inline results
+  during feasibility scan to avoid double computation - Guard against non-list values being silently
+  overwritten with empty string
+
+- Inline small nested arrays instead of exploding into sub-tables
+  ([`b3435bc`](https://github.com/teriyakichild/mcp-condenser/commit/b3435bc4f645541b05c0a4420f9fce58ecb6cfe7))
+
+Nested arrays with ≤10 simple items per parent (e.g. topErrorApps) were being flattened into massive
+  sub-tables with non-unique join keys. Now they render inline as compact "name:value" strings in
+  the parent row.
+
+- Normalize empty lists in inlined fields, add edge-case tests
+  ([`a361ccf`](https://github.com/teriyakichild/mcp-condenser/commit/a361ccf37541a556ff82c59caec4eff9f1708d8e))
+
+- Empty lists for inlined fields now become "" instead of staying as [] - Added tests for: >10 items
+  fallback to sub-table, nested dicts not inlined, empty array rows get blank, no key column
+  skipped, multi-value column format
+
+- Require consistent keys across items before inlining
+  ([`f9c7e5f`](https://github.com/teriyakichild/mcp-condenser/commit/f9c7e5f5f35ed75a43899350e524a19d8fe10ee3))
+
+Bail out to sub-table when nested array items have different key sets, preventing silent data loss.
+  Added regression test for heterogeneous keys.
+
+- Sort val_cols for stable output, skip all-empty inlining, improve test assertions
+  ([`cf6c28f`](https://github.com/teriyakichild/mcp-condenser/commit/cf6c28fb95f0f78ef2fbb0ce4e21b5ecb7e8afd5))
+
+- Sort value columns alphabetically for deterministic inline rendering - Require at least one
+  non-empty cached result before inlining a field - Assert sub-table presence (not just absence of
+  inline format) in tests
+
+### Chores
+
+- Update uv.lock to match v0.8.0
+  ([`068eb34`](https://github.com/teriyakichild/mcp-condenser/commit/068eb34c056dc8832e4901453ae60fc17dc93df4))
+
+
 ## v0.8.1 (2026-03-04)
 
 ### Bug Fixes
