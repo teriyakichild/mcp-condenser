@@ -550,8 +550,9 @@ def render_split(name: str, arr: list, annotations: list[str], cleaned_rows: lis
 def _inline_nested_array(arr_val: list) -> str | None:
     """Try to render a small nested array as a compact inline string.
 
-    Returns a compact string like ``name:val,name:val`` for small arrays of
-    simple dicts, or None if the array is too complex to inline.
+    Returns a compact string like ``name:val name:val`` for small arrays of
+    simple dicts, or ``name(v1,v2)`` when multiple value columns exist.
+    Returns None if the array is too complex to inline.
     """
     MAX_INLINE_ITEMS = 10
     if not arr_val or not isinstance(arr_val, list):
@@ -621,20 +622,22 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
     # Try to inline small nested arrays into parent rows as compact strings
     inlined_fields = set()
     for af in sorted(array_fields):
+        cached: list[tuple[int, str]] = []  # (row_index, rendered_string)
         can_inline = True
-        for fl in all_flat:
-            arr_val = fl.get(af, [])
-            if isinstance(arr_val, list) and arr_val:
-                if _inline_nested_array(arr_val) is None:
-                    can_inline = False
-                    break
+        for i, fl in enumerate(all_flat):
+            arr_val = fl.get(af)
+            if not isinstance(arr_val, list):
+                continue  # leave non-list values untouched
+            if not arr_val:
+                continue  # empty list → skip
+            rendered = _inline_nested_array(arr_val)
+            if rendered is None:
+                can_inline = False
+                break
+            cached.append((i, rendered))
         if can_inline:
-            for fl in all_flat:
-                arr_val = fl.get(af, [])
-                if isinstance(arr_val, list) and arr_val:
-                    fl[af] = _inline_nested_array(arr_val)
-                else:
-                    fl[af] = ""
+            for i, rendered in cached:
+                all_flat[i][af] = rendered
             inlined_fields.add(af)
     array_fields -= inlined_fields
 
