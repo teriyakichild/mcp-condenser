@@ -426,6 +426,23 @@ class TestInlineNestedArrays:
         text = "\n".join(blocks)
         assert "x(1,2)" in text or "x(2,1)" in text
 
+    def test_heterogeneous_keys_not_inlined(self):
+        """Arrays where items have different keys should NOT be inlined."""
+        rows = [
+            {"id": "a", "items": [
+                {"name": "x", "errors": 10},
+                {"name": "y", "errors": 20, "extra": "z"},
+            ]},
+            {"id": "b", "items": [
+                {"name": "p", "errors": 30},
+            ]},
+        ]
+        blocks = render_table("T", rows)
+        text = "\n".join(blocks)
+        # Should fall back to sub-table, not inline
+        assert "T.items" in text
+        assert "x:10" not in text
+
 
     def test_typo_raises_helpful_error(self):
         cfg = ServerConfig(

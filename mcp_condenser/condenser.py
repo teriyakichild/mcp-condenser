@@ -566,9 +566,11 @@ def _inline_nested_array(arr_val: list) -> str | None:
         for v in item.values():
             if isinstance(v, (dict, list)):
                 return None
-    # Find a "key" column (name/id/key/label) and value columns
-    if not arr_val:
-        return None
+    # All items must share the same keys — bail if heterogeneous
+    first_keys = set(arr_val[0].keys())
+    for item in arr_val[1:]:
+        if set(item.keys()) != first_keys:
+            return None
     sample_keys = list(arr_val[0].keys())
     if len(sample_keys) < 2 or len(sample_keys) > 4:
         return None
