@@ -393,7 +393,8 @@ class TestInlineNestedArrays:
         ]
         blocks = render_table("T", rows)
         text = "\n".join(blocks)
-        assert "name:x" not in text  # not inlined
+        # Should fall back to sub-table, not inline
+        assert "T.items" in text
 
     def test_empty_array_rows_get_blank(self):
         """Rows with empty arrays should show blank, not []."""
@@ -414,7 +415,8 @@ class TestInlineNestedArrays:
         ]
         blocks = render_table("T", rows)
         text = "\n".join(blocks)
-        assert "1:2" not in text  # not inlined as key:val
+        # Should fall back to sub-table, not inline
+        assert "T.items" in text
 
     def test_multi_value_columns(self):
         """Arrays with multiple value columns render as name(v1,v2)."""
@@ -424,7 +426,7 @@ class TestInlineNestedArrays:
         ]
         blocks = render_table("T", rows)
         text = "\n".join(blocks)
-        assert "x(1,2)" in text or "x(2,1)" in text
+        assert "x(1,2)" in text  # val_cols sorted: v1, v2
 
     def test_heterogeneous_keys_not_inlined(self):
         """Arrays where items have different keys should NOT be inlined."""

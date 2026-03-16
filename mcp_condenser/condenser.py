@@ -584,7 +584,7 @@ def _inline_nested_array(arr_val: list) -> str | None:
             break
     if not key_col:
         return None
-    val_cols = [k for k in sample_keys if k != key_col]
+    val_cols = sorted([k for k in sample_keys if k != key_col])
     parts = []
     for item in arr_val:
         k = fmt(item.get(key_col, ""))
@@ -637,7 +637,7 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
                 can_inline = False
                 break
             cached.append((i, rendered))
-        if can_inline:
+        if can_inline and cached:
             for i, rendered in cached:
                 all_flat[i][af] = rendered
             # Normalize any remaining empty lists to "" so they don't
