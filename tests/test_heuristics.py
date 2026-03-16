@@ -355,19 +355,95 @@ class TestPivotKeyValueToggle:
         # No sub-table for Tags
         assert "Instances.Tags" not in text
 
-    def test_disabled_extracts_as_subtable(self):
+    def test_disabled_inlines_small_kv_arrays(self):
         rows = self._make_tagged_rows()
         blocks = render_table("Instances", rows, Heuristics(pivot_key_value=False))
         text = "\n".join(blocks)
-        # Should have a sub-table for Tags
-        assert "Instances.Tags" in text
-        # Pivoted columns should NOT appear
+        # Small KV arrays should be inlined as compact "Key:Value" strings
+        assert "Name:web" in text
+        assert "Env:prod" in text
+        # No sub-table or pivoted columns
+        assert "Instances.Tags" not in text
         assert "Tags.Name" not in text
         assert "Tags.Env" not in text
 
     def test_default_is_enabled(self):
         h = Heuristics()
         assert h.pivot_key_value is True
+
+
+class TestInlineNestedArrays:
+    """Tests for _inline_nested_array heuristic in render_table."""
+
+    def test_large_arrays_become_subtable(self):
+        """Arrays with >10 items per parent should NOT be inlined."""
+        rows = [
+            {"id": "a", "items": [{"name": f"n{i}", "val": i} for i in range(11)]},
+            {"id": "b", "items": [{"name": f"n{i}", "val": i} for i in range(11)]},
+        ]
+        blocks = render_table("T", rows)
+        text = "\n".join(blocks)
+        assert "T.items" in text  # sub-table, not inlined
+
+    def test_nested_dicts_not_inlined(self):
+        """Arrays containing nested dicts/lists should NOT be inlined."""
+        rows = [
+            {"id": "a", "items": [{"name": "x", "meta": {"deep": 1}}]},
+            {"id": "b", "items": [{"name": "y", "meta": {"deep": 2}}]},
+        ]
+        blocks = render_table("T", rows)
+        text = "\n".join(blocks)
+        # Should fall back to sub-table, not inline
+        assert "T.items" in text
+
+    def test_empty_array_rows_get_blank(self):
+        """Rows with empty arrays should show blank, not []."""
+        rows = [
+            {"id": "a", "tags": [{"name": "web", "errors": 10}]},
+            {"id": "b", "tags": []},
+        ]
+        blocks = render_table("T", rows)
+        text = "\n".join(blocks)
+        assert "web:10" in text
+        assert "[]" not in text
+
+    def test_no_key_column_not_inlined(self):
+        """Arrays without a name/key/label/id column should NOT be inlined."""
+        rows = [
+            {"id": "a", "items": [{"foo": 1, "bar": 2}]},
+            {"id": "b", "items": [{"foo": 3, "bar": 4}]},
+        ]
+        blocks = render_table("T", rows)
+        text = "\n".join(blocks)
+        # Should fall back to sub-table, not inline
+        assert "T.items" in text
+
+    def test_multi_value_columns(self):
+        """Arrays with multiple value columns render as name(v1,v2)."""
+        rows = [
+            {"id": "a", "items": [{"name": "x", "v1": 1, "v2": 2}]},
+            {"id": "b", "items": [{"name": "y", "v1": 3, "v2": 4}]},
+        ]
+        blocks = render_table("T", rows)
+        text = "\n".join(blocks)
+        assert "x(1,2)" in text  # val_cols sorted: v1, v2
+
+    def test_heterogeneous_keys_not_inlined(self):
+        """Arrays where items have different keys should NOT be inlined."""
+        rows = [
+            {"id": "a", "items": [
+                {"name": "x", "errors": 10},
+                {"name": "y", "errors": 20, "extra": "z"},
+            ]},
+            {"id": "b", "items": [
+                {"name": "p", "errors": 30},
+            ]},
+        ]
+        blocks = render_table("T", rows)
+        text = "\n".join(blocks)
+        # Should fall back to sub-table, not inline
+        assert "T.items" in text
+        assert "x:10" not in text
 
 
     def test_typo_raises_helpful_error(self):
