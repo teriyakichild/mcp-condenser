@@ -1,6 +1,56 @@
 # CHANGELOG
 
 
+## v0.8.3 (2026-03-26)
+
+### Bug Fixes
+
+- Address PR review feedback
+  ([`2a40b53`](https://github.com/teriyakichild/mcp-condenser/commit/2a40b535bb5a95e1295e02997b1c654fcf6d26f4))
+
+Gate _log_residual() diagnostic work behind logger.isEnabledFor(DEBUG) to avoid scanning all_flat
+  when debug logging is disabled.
+
+Fix test docstring/name mismatch — test checks for valid output, not identical output.
+
+- Eliminate silent data loss for nested arrays in render_table
+  ([`4d79b4f`](https://github.com/teriyakichild/mcp-condenser/commit/4d79b4f380fa20be0ce0ae2990ae4e05007787f0))
+
+render_table() had no fallback for array fields that couldn't be inlined or extracted as sub-tables
+  — data silently vanished. This affected Prometheus time-series values, Istio routing rules, and
+  any nested arrays that didn't fit the narrow inline/sub-table constraints.
+
+Add residual field tracking: after inlining and sub-table extraction, any remaining array fields are
+  rendered via recursive condense() (for arrays of dicts) or json.dumps() (for primitives/mixed).
+  Sub-tables now also recurse through render_table() so their nested arrays get the same treatment.
+
+Adds 4 new benchmark fixtures (Prometheus, Elasticsearch, Istio CRDs, JSONL access logs) with 60
+  questions and diagnostic logging for residual fields to guide future heuristic work.
+
+- Improve identity column detection for compound names like InstanceId
+  ([`d4bfe90`](https://github.com/teriyakichild/mcp-condenser/commit/d4bfe90f5d3f600ff4e86d34273d16f2c2339a3a))
+
+Identity column matching used exact last-segment comparison, so compound names like InstanceId,
+  NodeName, SubnetId never matched keywords "id" or "name". This caused poor identity column
+  selection in split-mode wide tables — IamInstanceProfile.Id was chosen over InstanceId, and
+  State.Name over Tags.Name.
+
+Changes: - Add _col_matches_keyword() with CamelCase/separator boundary detection to avoid false
+  positives (valid, liquid, filename rejected) - Score candidates by (cardinality, avg_value_length,
+  depth) via shared _identity_score() helper - In render_split, limit repeated identity columns to
+  best 2-3 per keyword with lazy stats computation - Update find_identity_column,
+  _find_identity_from_cleaned, order_columns, and render_split to use suffix matching consistently
+
+### Documentation
+
+- Update token reduction benchmarks with accurate numbers
+  ([`0558347`](https://github.com/teriyakichild/mcp-condenser/commit/05583474370ee210517b61eab31fc6f9155c892a))
+
+Add 5 new fixtures to the table (App performance, Prometheus, Elasticsearch, Istio, JSONL access
+  logs). Update EC2 from 86.9% to 56.3% — the old number was inflated by silently dropped sub-table
+  data.
+
+
 ## v0.8.2 (2026-03-16)
 
 ### Bug Fixes
