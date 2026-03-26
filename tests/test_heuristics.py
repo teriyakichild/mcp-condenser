@@ -635,6 +635,63 @@ class TestWideTableSplit:
         assert split_text != vert_text
 
 
+class TestSplitIdentityColumnSelection:
+    """Tests for identity column selection and cap in split rendering."""
+
+    def test_compound_identity_selected(self):
+        """InstanceId should be chosen over nested IamProfile.Id."""
+        rows = [
+            {"InstanceId": f"i-{i:03d}", "IamProfile": {"Id": f"AIPA{'X'*16}{i}"}, "State": {"Name": "running"},
+             "Tags": {"Name": f"svc-{i}"},
+             "cpu": {"cores": i, "usage": i*10}, "mem": {"gb": i*2, "pct": i*5}}
+            for i in range(5)
+        ]
+        h = Heuristics(wide_table_threshold=3, wide_table_format="split",
+                        elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        blocks = render_table("instances", rows, h)
+        text = "\n\n".join(blocks)
+        # Verify sub-tables exist and contain the right identity columns
+        for section_name in ["cpu", "mem"]:
+            full_marker = f"instances.{section_name}"
+            assert full_marker in text, f"Expected split sub-table {full_marker}"
+        # Find TOON header lines and verify identity columns
+        for line in text.split("\n"):
+            if line.strip().startswith("[") and "{" in line:
+                header = line.split("{")[1].split("}")[0]
+                cols = {c.strip().strip('"') for c in header.split(",")}
+                # Tags.Name and InstanceId should be in every sub-table header
+                if "cpu.cores" in cols or "mem.gb" in cols:
+                    assert "Tags.Name" in cols, f"Tags.Name missing from {cols}"
+                    assert "InstanceId" in cols, f"InstanceId missing from {cols}"
+
+    def test_identity_columns_capped_at_three(self):
+        """At most 3 identity columns repeated across sub-tables."""
+        rows = [
+            {"name": f"n{i}", "id": f"id{i}", "uid": f"uid{i}", "ref": f"ref{i}",
+             "namespace": f"ns{i}", "label": f"lbl{i}",
+             "a": {"x": i, "y": i*2}, "b": {"x": i*3, "y": i*4}}
+            for i in range(4)
+        ]
+        h = Heuristics(wide_table_threshold=3, wide_table_format="split",
+                        elide_all_zero=False, elide_all_null=False,
+                        elide_timestamps=False, elide_constants=False, group_tuples=False)
+        blocks = render_table("items", rows, h)
+        text = "\n\n".join(blocks)
+        # Find TOON header lines (start with [N]{...}) in sub-tables
+        all_id_cols = {"name", "id", "uid", "ref", "namespace", "label"}
+        for marker in ["--- items.a", "--- items.b"]:
+            assert marker in text, f"Expected sub-table {marker}"
+            section = text.split(marker)[1].split("---")[0]
+            # TOON header line: [N]{col1,col2,...}:
+            for line in section.split("\n"):
+                if line.strip().startswith("[") and "{" in line:
+                    header_content = line.split("{")[1].split("}")[0]
+                    cols_in_header = {c.strip() for c in header_content.split(",")}
+                    id_count = len(cols_in_header & all_id_cols)
+                    assert id_count <= 3, f"Expected <= 3 identity cols, got {id_count}: {cols_in_header & all_id_cols}"
+
+
 class TestProfiles:
     """Tests for PROFILES dict and resolve_profile()."""
 

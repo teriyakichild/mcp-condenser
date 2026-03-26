@@ -202,26 +202,80 @@ def union_columns(arr: list) -> list[str]:
     return list(keys)
 
 
+def _col_matches_keyword(col: str, kw: str) -> bool:
+    """Check if a column's last dot-segment matches the given keyword.
+
+    Exact leaf matches (case-insensitive) always succeed.  For short
+    identity keywords (``id``, ``uid``, ``name``) a tighter heuristic
+    avoids false positives like ``valid`` matching ``id``:
+
+    - separator before keyword: ``user_id``, ``node-name``
+    - CamelCase boundary: ``InstanceId``, ``NodeName``, ``UserUID``
+    """
+    leaf_full = col.split(".")[-1]
+    leaf = leaf_full.lower()
+    kw = kw.lower()
+
+    if leaf == kw:
+        return True
+
+    if kw in ("id", "uid", "name"):
+        # Separator-based suffix: user_id, node-name
+        for sep in ("_", "-"):
+            if leaf.endswith(sep + kw):
+                return True
+        # CamelCase / acronym boundary: InstanceId, NodeName, UserUID
+        for suffix in (kw.capitalize(), kw.upper()):
+            if leaf_full.endswith(suffix):
+                pos = len(leaf_full) - len(suffix)
+                # Boundary = start of leaf, or CamelCase transition (lower→upper),
+                # or non-alpha separator before the suffix.
+                if pos == 0 or leaf_full[pos - 1].islower() or not leaf_full[pos - 1].isalnum():
+                    return True
+        return False
+
+    return leaf.endswith(kw)
+
+
+def _identity_score(col: str, values: set[str]) -> tuple[int, float, int]:
+    """Score a column as an identity candidate.
+
+    Returns (cardinality, -avg_value_length, -depth) so that ``max()``
+    picks the column with the most distinct non-empty values, then the
+    shortest average value (concise identifiers preferred), then the
+    shallowest nesting depth (fewest dots).
+    """
+    avg_len = sum(len(v) for v in values) / max(len(values), 1)
+    return (len(values), -avg_len, -col.count("."))
+
+
+def _col_distinct_values(col: str, rows: list[dict], use_flatten: bool = False) -> set[str]:
+    """Collect distinct non-empty formatted values for *col* across *rows*."""
+    if use_flatten:
+        vals = {fmt(flatten(item).get(col)) for item in rows}
+    else:
+        vals = {fmt(row.get(col)) for row in rows}
+    vals.discard("")
+    return vals
+
+
 def find_identity_column(cols: list[str], arr: list | None = None) -> str | None:
     """Find the best identity column for back-references.
 
     When *arr* is provided and multiple columns match the same keyword,
-    the column with the highest cardinality (distinct non-empty values)
-    wins.  Falls back to first-match when arr is None.
+    the column with the highest cardinality wins; ties are broken by
+    shortest average value length (concise identifiers preferred), then
+    shallowest depth (fewest dots).  Falls back to first-match when arr
+    is None.
     """
     id_kw = ["name", "id", "uid"]
     for kw in id_kw:
-        matches = [c for c in cols if c.split(".")[-1].lower() == kw]
+        matches = [c for c in cols if _col_matches_keyword(c, kw)]
         if not matches:
             continue
         if len(matches) == 1 or arr is None:
             return matches[0]
-        # Pick the column with the most distinct non-empty values
-        def _cardinality(col: str) -> int:
-            vals = {fmt(flatten(item).get(col)) for item in arr}
-            vals.discard("")
-            return len(vals)
-        return max(matches, key=_cardinality)
+        return max(matches, key=lambda c: _identity_score(c, _col_distinct_values(c, arr, use_flatten=True)))
     return cols[0] if cols else None
 
 
@@ -293,10 +347,10 @@ def detect_numeric_tuples(cols: list[str], col_info: dict) -> dict[str, list[str
 # ── smart column ordering ───────────────────────────────────────────────────
 
 def order_columns(cols: list[str]) -> list[str]:
-    id_kw = {"name", "id", "ref", "uid", "namespace", "label", "nodename"}
+    _order_kw = ("name", "id", "ref", "uid", "namespace", "label", "nodename")
     ids, rest = [], []
     for c in cols:
-        if c.split(".")[-1].lower() in id_kw:
+        if any(_col_matches_keyword(c, kw) for kw in _order_kw):
             ids.append(c)
         else:
             rest.append(c)
@@ -443,21 +497,19 @@ def preprocess_table(name: str, arr: list, heuristics: Heuristics | None = None)
 def _find_identity_from_cleaned(headers: list[str], cleaned_rows: list[dict]) -> str | None:
     """Find best identity column from cleaned rows (post-preprocessing headers).
 
-    Uses cardinality to break ties when multiple columns match the same keyword.
+    Among columns whose names match common identity keywords ("name", "id",
+    "uid"), prefer the one with highest cardinality; if tied, choose the
+    column with the shortest average non-empty value length; if still tied,
+    prefer the column with the shallowest nesting depth (fewest dots).
     """
     id_kw = ["name", "id", "uid"]
     for kw in id_kw:
-        matches = [h for h in headers if h.split(".")[-1].lower() == kw]
+        matches = [h for h in headers if _col_matches_keyword(h, kw)]
         if not matches:
             continue
         if len(matches) == 1:
             return matches[0]
-        # Pick column with highest cardinality
-        def _card(col):
-            vals = {fmt(row.get(col)) for row in cleaned_rows}
-            vals.discard("")
-            return len(vals)
-        return max(matches, key=_card)
+        return max(matches, key=lambda c: _identity_score(c, _col_distinct_values(c, cleaned_rows)))
     return None
 
 
@@ -499,9 +551,26 @@ def render_split(name: str, arr: list, annotations: list[str], cleaned_rows: lis
     """
     headers = [h for h, _ in final_cols]
 
-    # Detect identity columns
-    id_kw = {"name", "id", "ref", "uid", "namespace", "label", "nodename"}
-    identity_cols = [h for h in headers if h.split(".")[-1].lower() in id_kw]
+    # Pick the best identity columns to repeat in each sub-table.
+    # Compute distinct values lazily, only for columns that match a keyword.
+    _split_kw = ("name", "id", "ref", "uid", "namespace", "label", "nodename")
+    _col_vals_cache: dict[str, set[str]] = {}
+    identity_cols = []
+    for kw in _split_kw:
+        matches = [h for h in headers if _col_matches_keyword(h, kw)]
+        if not matches:
+            continue
+        if len(matches) == 1:
+            best = matches[0]
+        else:
+            for m in matches:
+                if m not in _col_vals_cache:
+                    _col_vals_cache[m] = _col_distinct_values(m, cleaned_rows)
+            best = max(matches, key=lambda c: _identity_score(c, _col_vals_cache[c]))
+        if best not in identity_cols:
+            identity_cols.append(best)
+        if len(identity_cols) >= 3:
+            break
 
     # Group columns by top-level prefix
     groups: dict[str, list[str]] = OrderedDict()
