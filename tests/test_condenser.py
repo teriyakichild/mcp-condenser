@@ -5,7 +5,7 @@ from collections import OrderedDict
 
 import pytest
 
-from mcp_condenser.condenser import classify, flatten, fmt, find_identity_column, is_homogeneous_array, is_kv_array, pivot_kv_fields, condense_text, toon_encode, condense_json, toon_encode_json, truncate_to_token_limit, count_tokens
+from mcp_condenser.condenser import classify, flatten, fmt, find_identity_column, is_homogeneous_array, is_kv_array, pivot_kv_fields, condense_text, toon_encode, condense_json, toon_encode_json, truncate_to_token_limit, count_tokens, order_columns
 from mcp_condenser.parsers import parse_input
 
 
@@ -398,6 +398,60 @@ class TestFindIdentityColumn:
         """No keyword match returns first column."""
         cols = ["cpu.usageNanoCores", "memory.rssBytes"]
         assert find_identity_column(cols) == "cpu.usageNanoCores"
+
+
+class TestFindIdentityCompoundNames:
+    """Test identity detection for compound column names like InstanceId."""
+
+    def test_instanceid_matches_id_keyword(self):
+        """InstanceId should match 'id' keyword via suffix matching."""
+        cols = ["InstanceId", "InstanceType", "LaunchTime"]
+        assert find_identity_column(cols) == "InstanceId"
+
+    def test_instanceid_preferred_over_nested_id(self):
+        """InstanceId (shorter values) should beat IamInstanceProfile.Id."""
+        cols = ["InstanceId", "IamInstanceProfile.Id", "InstanceType"]
+        arr = [
+            {"InstanceId": "i-abc123", "IamInstanceProfile": {"Id": "AIPAAZCCBLSKRT05UIROD"}, "InstanceType": "t3.medium"},
+            {"InstanceId": "i-def456", "IamInstanceProfile": {"Id": "AIPAEEDTJVZHWJR64DPJA"}, "InstanceType": "m5.large"},
+            {"InstanceId": "i-ghi789", "IamInstanceProfile": {"Id": "AIPACFNFHOLQC3O18A5UR"}, "InstanceType": "r5.xlarge"},
+        ]
+        result = find_identity_column(cols, arr)
+        assert result == "InstanceId"
+
+    def test_tags_name_preferred_over_privatednsname(self):
+        """Tags.Name (shorter values) beats PrivateDnsName (long values)."""
+        cols = ["Tags.Name", "PrivateDnsName", "InstanceType"]
+        arr = [
+            {"Tags": {"Name": "web-00"}, "PrivateDnsName": "ip-10-136-36-156.ec2.internal", "InstanceType": "t3.medium"},
+            {"Tags": {"Name": "api-01"}, "PrivateDnsName": "ip-10-85-208-125.ec2.internal", "InstanceType": "m5.large"},
+            {"Tags": {"Name": "db-02"}, "PrivateDnsName": "ip-10-79-121-222.ec2.internal", "InstanceType": "r5.xlarge"},
+        ]
+        result = find_identity_column(cols, arr)
+        assert result == "Tags.Name"
+
+    def test_nodename_matches_name_keyword(self):
+        """NodeName should match 'name' keyword for K8s-style data."""
+        cols = ["NodeName", "CpuUsage", "MemoryUsage"]
+        assert find_identity_column(cols) == "NodeName"
+
+    def test_non_identity_not_matched(self):
+        """EbsOptimized (ends with 'ed') should not match 'id'."""
+        cols = ["EbsOptimized", "ClientToken", "InstanceType"]
+        assert find_identity_column(cols) == "EbsOptimized"
+
+    def test_false_positives_rejected(self):
+        """Words like valid/liquid/filename must not match id/name."""
+        cols = ["valid", "liquid", "filename", "hostname"]
+        # None match identity keywords, so first col is returned as fallback
+        assert find_identity_column(cols) == "valid"
+
+    def test_compound_names_ordered_first(self):
+        """order_columns should push compound identity names to the front."""
+        cols = ["LaunchTime", "InstanceId", "InstanceType", "NodeName"]
+        ordered = order_columns(cols)
+        assert ordered.index("InstanceId") < ordered.index("LaunchTime")
+        assert ordered.index("NodeName") < ordered.index("LaunchTime")
 
 
 class TestIsKvArray:
