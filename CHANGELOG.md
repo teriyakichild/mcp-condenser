@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.8.4 (2026-03-26)
+
+### Bug Fixes
+
+- Use original tool name for upstream calls when prefix_tools is enabled
+  ([`73152fb`](https://github.com/teriyakichild/mcp-condenser/commit/73152fbd0f4de43de042ed1669c3491a565000b0))
+
+ProxyTool.run() uses self.name to call the upstream MCP server, but when prefix_tools is enabled,
+  self.name gets changed to the prefixed version (e.g. server_name_tool_name). This causes "tool not
+  found" errors from the upstream server which only knows the original name.
+
+Introduces _make_patched_run() which calls the upstream client directly with the original remote
+  name, bypassing ProxyTool.run() entirely so no shared state is mutated and concurrent async calls
+  are safe.
+
+
 ## v0.8.3 (2026-03-26)
 
 ### Bug Fixes
