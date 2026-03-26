@@ -23,7 +23,8 @@ similar.
    compact combined columns.
 
 The result is a human-readable, LLM-friendly text representation that typically
-achieves 60-80% token reduction on real-world API responses.
+achieves 25-68% token reduction on real-world API responses while
+maintaining or improving LLM comprehension.
 
 ## Quick start
 
@@ -116,22 +117,28 @@ cat pods.yaml | uv run mcp-condenser
 
 ### Token reduction
 
-Measured across Kubernetes, AWS, and database fixtures using
-`tiktoken/cl100k_base`:
+Measured across Kubernetes, AWS, database, monitoring, logging, and CDN fixtures
+using `tiktoken/cl100k_base`:
 
 | Fixture | Domain | Raw tokens | TOON tokens | Reduction |
 |---------|--------|-------------|-------------|-----------|
 | K8s 16-pod node | Kubernetes | 9,876 | 3,656 | **63.0%** |
 | K8s 6-pod node | Kubernetes | 15,285 | 5,919 | **61.3%** |
 | K8s 30-pod node | Kubernetes | 69,885 | 22,229 | **68.2%** |
-| EC2 instances | AWS | 33,498 | 4,386 | **86.9%** |
+| EC2 instances | AWS | 33,498 | 14,645 | **56.3%** |
 | SQL orders | Database | 26,165 | 11,298 | **56.8%** |
 | Deploy inventory | DevOps (XML) | 1,928 | 664 | **65.6%** |
 | Server metrics | Infra (CSV) | 959 | 994 | -3.6% |
+| App performance | APM (CSV) | 1,760 | 1,535 | **12.8%** |
+| Prometheus query | Monitoring | 3,083 | 2,292 | **25.7%** |
+| Elasticsearch logs | Logging | 6,489 | 3,468 | **46.6%** |
+| Istio VirtualServices | Kubernetes | 4,197 | 3,141 | **25.2%** |
+| Access logs | CDN/LB (JSONL) | 7,158 | 4,582 | **36.0%** |
 
 Compression is domain-agnostic: Kubernetes pod listings, AWS EC2
-describe-instances responses, SQL result sets, and XML API responses all
-benefit, with reductions ranging from 57% to 87%.
+describe-instances responses, SQL result sets, Prometheus time-series,
+Elasticsearch log queries, and XML/CSV/JSONL responses all benefit, with
+reductions ranging from 25% to 68%.
 
 > **Note on CSV:** CSV is already a tabular format, so TOON condensation adds
 > minimal overhead rather than saving tokens. The value of CSV support is
