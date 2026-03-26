@@ -684,6 +684,8 @@ def _classify_array_shape(arr_val: list) -> str:
 
 def _log_residual(table_name: str, field: str, all_flat: list, id_col: str | None) -> None:
     """Log diagnostic info for a residual (fallback-rendered) array field."""
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
     rows_with_data = sum(
         1 for fl in all_flat
         if isinstance(fl.get(field), list) and fl[field]

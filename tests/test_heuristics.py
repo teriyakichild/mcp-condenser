@@ -819,15 +819,13 @@ class TestResidualFallback:
         assert "prod" in result
         assert "data" in result
 
-    def test_existing_fixtures_unchanged(self):
-        """Existing K8s and EC2 fixtures produce identical output (no regressions)."""
+    def test_existing_fixtures_produce_valid_output(self):
+        """Existing fixtures still condense without errors and contain key data."""
         from pathlib import Path
         from benchmarks.fixtures import load_sample
 
         fixtures_dir = Path("tests/fixtures")
-        # These fixtures had no data loss before, so output should be identical
         for fname in ("toolresult.json", "aws_ec2_instances.json", "db_query_results.json"):
             raw, data = load_sample(fixtures_dir, fname)
             result = condense_text(data)
-            # All these fixtures should still produce valid output with key data
             assert len(result) > 100, f"{fname} produced suspiciously short output"
