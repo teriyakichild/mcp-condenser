@@ -26,6 +26,11 @@ def load_sample(fixtures_dir: Path, filename: str):
         data, _ = parse_input(raw, format_hint=hint)
         return raw, data
 
+    # JSONL — parse each line as a JSON object
+    if ext == ".jsonl":
+        data = [json.loads(line) for line in raw.splitlines() if line.strip()]
+        return raw, data
+
     # JSON (default) — with envelope unwrapping
     data = json.loads(raw)
     if isinstance(data, dict) and set(data.keys()) == {"result"} and isinstance(data["result"], str):
@@ -106,6 +111,26 @@ FIXTURE_METADATA: dict[str, dict] = {
         "domain": "APM",
         "label": "App performance CSV",
         "description": "Application performance metrics — 30 microservices x 25 columns (CSV format, heavy elision + tuple grouping)",
+    },
+    "prometheus_query_range.json": {
+        "domain": "Monitoring",
+        "label": "Prometheus time-series",
+        "description": "Prometheus query_range response — 12 CPU usage time-series x 13 data points across 3 namespaces",
+    },
+    "elasticsearch_logs.json": {
+        "domain": "Logging",
+        "label": "Elasticsearch logs",
+        "description": "Elasticsearch search response — 25 error/warning log hits with messages, stack traces, and mixed null fields",
+    },
+    "k8s_istio_virtualservices.json": {
+        "domain": "Kubernetes",
+        "label": "Istio VirtualServices",
+        "description": "Kubernetes CRD list — 10 Istio VirtualService resources with deep routing rules, fault injection, and CORS",
+    },
+    "access_logs.jsonl": {
+        "domain": "CDN/LB",
+        "label": "Access logs JSONL",
+        "description": "HTTP access logs — 40 JSONL lines from load balancer with status codes, durations, and cache status",
     },
 }
 
@@ -832,6 +857,330 @@ QUESTIONS: dict[str, list[tuple[str, str, callable]]] = {
         (
             "What is the latency.p99 of the service with the highest requests_per_sec?",
             "22",
+            contains_or_numeric,
+        ),
+    ],
+    "prometheus_query_range.json": [
+        # --- direct lookups ---
+        (
+            "How many metric time-series are in the result?",
+            "12",
+            contains_or_numeric,
+        ),
+        (
+            "How many data points does each time-series have?",
+            "13",
+            contains_or_numeric,
+        ),
+        (
+            "How many unique namespaces are represented?",
+            "3",
+            contains_or_numeric,
+        ),
+        (
+            "What is the job label shared by all metrics?",
+            "kubelet",
+            contains,
+        ),
+        (
+            "What is the metric name (__name__) for all series?",
+            "container_cpu_usage_seconds_total",
+            contains,
+        ),
+        # --- filtering, counting ---
+        (
+            "How many series are in the 'ecommerce' namespace?",
+            "4",
+            contains_or_numeric,
+        ),
+        (
+            "How many series are on node-03?",
+            "4",
+            contains_or_numeric,
+        ),
+        (
+            "Which containers run on node-01? List only the container names.",
+            "checkout-api",
+            contains,
+        ),
+        # --- cross-reference, extremes ---
+        (
+            "Which container has the highest peak CPU value? Give the container name only.",
+            "log-collector",
+            contains,
+        ),
+        (
+            "What is the peak CPU value for the log-collector container?",
+            "2.347",
+            contains_or_numeric,
+        ),
+        (
+            "Which container has the lowest average CPU usage? Give the container name only.",
+            "alertmanager",
+            contains,
+        ),
+        (
+            "What is the peak CPU value for the checkout-api container?",
+            "1.923",
+            contains_or_numeric,
+        ),
+        # --- multi-hop, pattern detection ---
+        (
+            "Which container shows a CPU spike pattern (values that rise sharply then fall back)? Give the container name only.",
+            "checkout-api",
+            contains,
+        ),
+        (
+            "What node is the log-collector container running on?",
+            "node-03",
+            contains,
+        ),
+        (
+            "What is the instance IP address for containers on node-02?",
+            "10.0.1.15",
+            contains,
+        ),
+    ],
+    "elasticsearch_logs.json": [
+        # --- direct lookups ---
+        (
+            "How many log hits are in the response?",
+            "25",
+            contains_or_numeric,
+        ),
+        (
+            "How many hits have level 'ERROR'?",
+            "10",
+            contains_or_numeric,
+        ),
+        (
+            "How many hits have level 'WARN'?",
+            "12",
+            contains_or_numeric,
+        ),
+        (
+            "How many hits have level 'CRITICAL'?",
+            "3",
+            contains_or_numeric,
+        ),
+        (
+            "What environment are all the logs from?",
+            "production",
+            contains,
+        ),
+        # --- filtering, counting ---
+        (
+            "How many unique services are represented in the hits?",
+            "6",
+            contains_or_numeric,
+        ),
+        (
+            "How many hits are from the 'us-east-1' region?",
+            "16",
+            contains_or_numeric,
+        ),
+        (
+            "How many hits are from the 'eu-west-1' region?",
+            "9",
+            contains_or_numeric,
+        ),
+        (
+            "How many hits have a non-null stack_trace?",
+            "4",
+            contains_or_numeric,
+        ),
+        (
+            "How many hits have a non-null user_id?",
+            "10",
+            contains_or_numeric,
+        ),
+        # --- cross-reference, extremes ---
+        (
+            "Which service has the log hit with the highest _score? Give the service name only.",
+            "checkout-api",
+            contains,
+        ),
+        (
+            "What is the highest duration_ms value in the hits?",
+            "45012",
+            contains_or_numeric,
+        ),
+        (
+            "Which service has the hit with the highest duration_ms? Give the service name only.",
+            "inventory-service",
+            contains,
+        ),
+        (
+            "What is the error_type of the hit with the highest duration_ms?",
+            "ConnectionPoolExhaustedError",
+            contains,
+        ),
+        # --- multi-hop ---
+        (
+            "How many hits have HTTP status 500?",
+            "4",
+            contains_or_numeric,
+        ),
+    ],
+    "k8s_istio_virtualservices.json": [
+        # --- direct lookups ---
+        (
+            "How many VirtualService resources are listed?",
+            "10",
+            contains_or_numeric,
+        ),
+        (
+            "How many VirtualServices are in the 'ecommerce' namespace?",
+            "4",
+            contains_or_numeric,
+        ),
+        (
+            "How many VirtualServices are in the 'platform' namespace?",
+            "3",
+            contains_or_numeric,
+        ),
+        (
+            "How many unique namespaces are there?",
+            "4",
+            contains_or_numeric,
+        ),
+        (
+            "How many VirtualServices belong to the 'commerce' team?",
+            "4",
+            contains_or_numeric,
+        ),
+        # --- filtering, counting ---
+        (
+            "Which VirtualService has the highest generation number? Give the name only.",
+            "api-gateway",
+            contains,
+        ),
+        (
+            "What is the generation number of the api-gateway VirtualService?",
+            "7",
+            contains_or_numeric,
+        ),
+        (
+            "Which VirtualService has fault injection configured with a delay? Give the name only.",
+            "payment-gateway",
+            contains,
+        ),
+        (
+            "Which VirtualService has traffic mirroring configured? Give the name only.",
+            "config-service",
+            contains,
+        ),
+        (
+            "What host does config-service mirror traffic to?",
+            "config-service-shadow",
+            contains,
+        ),
+        # --- cross-reference, routing rules ---
+        (
+            "What is the canary traffic weight split for checkout-api (new/old)? Give as two numbers.",
+            "90",
+            contains_or_numeric,
+        ),
+        (
+            "Which VirtualService has the longest timeout value? Give the name only.",
+            "spark-thrift-server",
+            contains,
+        ),
+        (
+            "Which VirtualService has the most retry attempts configured? Give the name only.",
+            "jaeger-collector",
+            contains,
+        ),
+        (
+            "How many VirtualServices have header-based routing (x-env header matching)?",
+            "3",
+            contains_or_numeric,
+        ),
+        # --- multi-hop ---
+        (
+            "Which VirtualService has both a CORS policy and header-based routing? Give the name only.",
+            "api-gateway",
+            contains,
+        ),
+    ],
+    "access_logs.jsonl": [
+        # --- direct lookups ---
+        (
+            "How many access log entries are there?",
+            "40",
+            contains_or_numeric,
+        ),
+        (
+            "How many requests used the GET method?",
+            "28",
+            contains_or_numeric,
+        ),
+        (
+            "How many requests used the POST method?",
+            "8",
+            contains_or_numeric,
+        ),
+        (
+            "How many requests returned status 200?",
+            "24",
+            contains_or_numeric,
+        ),
+        (
+            "How many unique client IP addresses are there?",
+            "11",
+            contains_or_numeric,
+        ),
+        # --- filtering, counting ---
+        (
+            "How many requests are from the 'us-east-1' region?",
+            "26",
+            contains_or_numeric,
+        ),
+        (
+            "How many requests have cache_status 'HIT'?",
+            "15",
+            contains_or_numeric,
+        ),
+        (
+            "How many requests have cache_status 'MISS'?",
+            "20",
+            contains_or_numeric,
+        ),
+        (
+            "How many requests have a non-null user_id?",
+            "10",
+            contains_or_numeric,
+        ),
+        (
+            "How many requests returned status 500?",
+            "3",
+            contains_or_numeric,
+        ),
+        # --- cross-reference, extremes ---
+        (
+            "What is the highest duration_ms value?",
+            "2456",
+            contains_or_numeric,
+        ),
+        (
+            "Which service has the most requests? Give the service name only.",
+            "product-api",
+            contains,
+        ),
+        (
+            "How many times does client IP 203.0.113.99 appear?",
+            "6",
+            contains_or_numeric,
+        ),
+        # --- multi-hop, pattern detection ---
+        (
+            "What HTTP status codes does client IP 203.0.113.99 receive? List the unique codes.",
+            "500",
+            contains,
+        ),
+        (
+            "How many unique user agent strings are there?",
+            "4",
             contains_or_numeric,
         ),
     ],

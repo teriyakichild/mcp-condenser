@@ -14,13 +14,15 @@ Usage:
     python condenser.py input.json -o out.txt -q
 """
 
-import json, math, sys, re, argparse, warnings
+import json, logging, math, sys, re, argparse, warnings
 from dataclasses import dataclass
 from typing import Any
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timezone
 
 import toon_format
+
+logger = logging.getLogger("mcp_condenser")
 
 from mcp_condenser.parsers import parse_input  # noqa: F401 — re-export
 
@@ -665,6 +667,42 @@ def _inline_nested_array(arr_val: list) -> str | None:
     return " ".join(parts)
 
 
+def _classify_array_shape(arr_val: list) -> str:
+    """Classify an array's shape for residual diagnostics."""
+    if not arr_val:
+        return "empty"
+    if all(isinstance(x, dict) for x in arr_val):
+        if any(isinstance(v, (dict, list)) for x in arr_val for v in x.values()):
+            return "complex-dicts"
+        return "simple-dicts"
+    if all(isinstance(x, list) for x in arr_val):
+        return "array-of-arrays"
+    if all(isinstance(x, (str, int, float, bool, type(None))) for x in arr_val):
+        return "primitive-list"
+    return "mixed"
+
+
+def _log_residual(table_name: str, field: str, all_flat: list, id_col: str | None) -> None:
+    """Log diagnostic info for a residual (fallback-rendered) array field."""
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    rows_with_data = sum(
+        1 for fl in all_flat
+        if isinstance(fl.get(field), list) and fl[field]
+    )
+    # Classify shape from first non-empty value
+    shape = "unknown"
+    for fl in all_flat:
+        v = fl.get(field)
+        if isinstance(v, list) and v:
+            shape = _classify_array_shape(v)
+            break
+    logger.debug(
+        "residual field: %s.%s shape=%s rows=%d",
+        table_name, field, shape, rows_with_data,
+    )
+
+
 def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> list[str]:
     """Render a homogeneous array as TOON table block(s).
 
@@ -748,6 +786,9 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
             if len(common) >= 2:
                 sub_tables[af] = sub_items
 
+    # Identify residual array fields not handled by inlining or sub-table extraction
+    residual_fields = array_fields - set(sub_tables.keys())
+
     # Now preprocess the parent table using pivoted flat dicts
     # (array fields are excluded by union_columns since they skip list values)
     annotations, cleaned_rows, final_cols = preprocess_table(name, all_flat, heuristics)
@@ -768,27 +809,32 @@ def render_table(name: str, arr: list, heuristics: Heuristics | None = None) -> 
         parts.append(toon_text)
         blocks.append("\n".join(parts))
 
-    # Render sub-tables
+    # Render sub-tables — recurse through render_table so nested arrays
+    # within sub-table items also get residual fallback treatment.
     for af, sub_items in sorted(sub_tables.items()):
         sub_name = f"{name}.{af}"
-        # Wrap sub_items back into dicts for render_table recursion
-        # sub_items are already flat dicts, wrap in list
-        sub_annotations, sub_cleaned, sub_final = preprocess_table(sub_name, [dict(si) for si in sub_items], heuristics)
+        blocks.extend(render_table(sub_name, [dict(si) for si in sub_items], heuristics))
 
-        # Apply same threshold/format check for sub-tables
-        if heuristics.wide_table_threshold > 0 and len(sub_final) > heuristics.wide_table_threshold:
-            if heuristics.wide_table_format == "split":
-                block = render_split(sub_name, sub_items, sub_annotations, sub_cleaned, sub_final, heuristics)
+    # Render residual array fields — fallback for data that couldn't be
+    # inlined or extracted as sub-tables.  Uses recursive condense() for
+    # arrays of dicts, json.dumps() for everything else.
+    for af in sorted(residual_fields):
+        _log_residual(name, af, all_flat, id_col)
+        for fl in all_flat:
+            arr_val = fl.get(af, [])
+            if not isinstance(arr_val, list) or not arr_val:
+                continue
+            parent_id = fmt(fl.get(id_col, "")) if id_col else ""
+            label = f"{name}.{af}"
+            if parent_id:
+                label += f"[{parent_id}]"
+            if all(isinstance(item, dict) for item in arr_val):
+                # Array of dicts — recurse for full semantic processing
+                for i, item in enumerate(arr_val):
+                    blocks.extend(condense(f"{label}[{i}]", item, heuristics))
             else:
-                block = render_vertical(sub_name, sub_items, sub_annotations, sub_cleaned, sub_final)
-            blocks.append(block)
-        else:
-            sub_toon = toon_format.encode(sub_cleaned)
-            sub_header = f"--- {sub_name} ({len(sub_items)} rows) ---"
-            sub_parts = [sub_header]
-            sub_parts.extend(sub_annotations)
-            sub_parts.append(sub_toon)
-            blocks.append("\n".join(sub_parts))
+                # Primitives, arrays-of-arrays, mixed — lossless JSON
+                blocks.append(f"{label}: {json.dumps(arr_val)}")
 
     return blocks
 

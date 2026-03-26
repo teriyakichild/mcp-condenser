@@ -745,3 +745,87 @@ class TestProfiles:
         """Each profile only overrides a few fields, not all."""
         for name, overrides in PROFILES.items():
             assert len(overrides) <= 3, f"Profile {name} has too many overrides"
+
+
+class TestResidualFallback:
+    """Tests that nested array data is never silently dropped."""
+
+    def test_array_of_arrays_preserved(self):
+        """Prometheus-style: values is array of [timestamp, string] pairs."""
+        data = [
+            {"name": "cpu", "host": "node-1", "values": [[1000, "0.5"], [2000, "0.8"]]},
+            {"name": "mem", "host": "node-1", "values": [[1000, "0.3"], [2000, "0.4"]]},
+        ]
+        result = condense_text(data)
+        assert "0.5" in result
+        assert "0.8" in result
+        assert "0.3" in result
+        assert "0.4" in result
+
+    def test_complex_nested_dicts_preserved(self):
+        """Istio-style: http is array of dicts with nested arrays/dicts."""
+        data = [
+            {
+                "name": "svc-a",
+                "namespace": "prod",
+                "http": [
+                    {
+                        "timeout": "30s",
+                        "route": [
+                            {"destination": {"host": "svc-a", "port": 8080}, "weight": 90},
+                            {"destination": {"host": "svc-a", "port": 8080}, "weight": 10},
+                        ],
+                    },
+                ],
+            },
+            {
+                "name": "svc-b",
+                "namespace": "prod",
+                "http": [
+                    {
+                        "timeout": "15s",
+                        "route": [
+                            {"destination": {"host": "svc-b", "port": 9090}, "weight": 100},
+                        ],
+                    },
+                ],
+            },
+        ]
+        result = condense_text(data)
+        assert "weight" in result
+        assert "90" in result
+        assert "10" in result
+        assert "30s" in result
+        assert "15s" in result
+
+    def test_primitive_list_preserved(self):
+        """Small primitive arrays like hosts: ["a.local"] must not vanish."""
+        data = [
+            {"name": "svc-a", "id": "1", "hosts": ["a.svc.local"]},
+            {"name": "svc-b", "id": "2", "hosts": ["b.svc.local", "b-alt.svc.local"]},
+        ]
+        result = condense_text(data)
+        assert "a.svc.local" in result
+        assert "b.svc.local" in result
+        assert "b-alt.svc.local" in result
+
+    def test_single_sub_item_array_preserved(self):
+        """Array with only 1 dict item should not be dropped."""
+        data = [
+            {"name": "x", "id": "1", "tags": [{"key": "env", "val": "prod"}]},
+            {"name": "y", "id": "2", "tags": [{"key": "team", "val": "data"}]},
+        ]
+        result = condense_text(data)
+        assert "prod" in result
+        assert "data" in result
+
+    def test_existing_fixtures_produce_valid_output(self):
+        """Existing fixtures still condense without errors and contain key data."""
+        from pathlib import Path
+        from benchmarks.fixtures import load_sample
+
+        fixtures_dir = Path("tests/fixtures")
+        for fname in ("toolresult.json", "aws_ec2_instances.json", "db_query_results.json"):
+            raw, data = load_sample(fixtures_dir, fname)
+            result = condense_text(data)
+            assert len(result) > 100, f"{fname} produced suspiciously short output"

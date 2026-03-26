@@ -1,0 +1,618 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "metadata": {
+    "resourceVersion": ""
+  },
+  "items": [
+    {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "checkout-api",
+        "namespace": "ecommerce",
+        "uid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "resourceVersion": "184923",
+        "generation": 3,
+        "creationTimestamp": "2024-01-15T10:30:00Z",
+        "labels": {
+          "app": "checkout-api",
+          "team": "commerce",
+          "version": "v2"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "..."
+        }
+      },
+      "spec": {
+        "hosts": ["checkout-api.ecommerce.svc.cluster.local"],
+        "gateways": ["mesh"],
+        "http": [
+          {
+            "match": [
+              {"uri": {"prefix": "/api/v2"}}
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "checkout-api",
+                  "port": {"number": 8080},
+                  "subset": "v2"
+                },
+                "weight": 90
+              },
+              {
+                "destination": {
+                  "host": "checkout-api",
+                  "port": {"number": 8080},
+                  "subset": "v1"
+                },
+                "weight": 10
+              }
+            ],
+            "timeout": "30s",
+            "retries": {
+              "attempts": 3,
+              "perTryTimeout": "10s"
+            }
+          },
+          {
+            "match": [
+              {"uri": {"prefix": "/api/v1"}}
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "checkout-api",
+                  "port": {"number": 8080},
+                  "subset": "v1"
+                }
+              }
+            ],
+            "timeout": "15s",
+            "retries": {
+              "attempts": 2,
+              "perTryTimeout": "5s"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "product-catalog",
+        "namespace": "ecommerce",
+        "uid": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+        "resourceVersion": "192847",
+        "generation": 5,
+        "creationTimestamp": "2024-01-18T14:22:00Z",
+        "labels": {
+          "app": "product-catalog",
+          "team": "commerce",
+          "version": "v3"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "..."
+        }
+      },
+      "spec": {
+        "hosts": ["product-catalog.ecommerce.svc.cluster.local"],
+        "gateways": ["mesh"],
+        "http": [
+          {
+            "match": [
+              {
+                "headers": {
+                  "x-env": {"exact": "canary"}
+                }
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "product-catalog",
+                  "port": {"number": 8080},
+                  "subset": "v3-canary"
+                }
+              }
+            ],
+            "timeout": "10s",
+            "retries": {
+              "attempts": 2,
+              "perTryTimeout": "3s"
+            }
+          },
+          {
+            "route": [
+              {
+                "destination": {
+                  "host": "product-catalog",
+                  "port": {"number": 8080},
+                  "subset": "v3"
+                }
+              }
+            ],
+            "timeout": "10s",
+            "retries": {
+              "attempts": 2,
+              "perTryTimeout": "3s"
+            },
+            "corsPolicy": {
+              "allowOrigins": [{"exact": "https://store.example.com"}, {"exact": "https://admin.example.com"}],
+              "allowMethods": ["GET", "POST", "PUT", "DELETE"],
+              "allowHeaders": ["Authorization", "Content-Type", "X-Request-ID"],
+              "maxAge": "24h"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "payment-gateway",
+        "namespace": "ecommerce",
+        "uid": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+        "resourceVersion": "201534",
+        "generation": 2,
+        "creationTimestamp": "2024-01-22T09:15:00Z",
+        "labels": {
+          "app": "payment-gateway",
+          "team": "commerce",
+          "version": "v1"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "..."
+        }
+      },
+      "spec": {
+        "hosts": ["payment-gateway.ecommerce.svc.cluster.local"],
+        "gateways": ["mesh"],
+        "http": [
+          {
+            "match": [
+              {"uri": {"prefix": "/pay"}}
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "payment-gateway",
+                  "port": {"number": 443},
+                  "subset": "v1"
+                }
+              }
+            ],
+            "timeout": "60s",
+            "retries": {
+              "attempts": 1,
+              "perTryTimeout": "30s",
+              "retryOn": "5xx,reset,connect-failure"
+            },
+            "fault": {
+              "delay": {
+                "percentage": {"value": 0.1},
+                "fixedDelay": "5s"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "cart-service",
+        "namespace": "ecommerce",
+        "uid": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f80",
+        "resourceVersion": "210876",
+        "generation": 4,
+        "creationTimestamp": "2024-02-01T16:45:00Z",
+        "labels": {
+          "app": "cart-service",
+          "team": "commerce",
+          "version": "v2"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "..."
+        }
+      },
+      "spec": {
+        "hosts": ["cart-service.ecommerce.svc.cluster.local"],
+        "gateways": ["mesh"],
+        "http": [
+          {
+            "match": [
+              {
+                "headers": {
+                  "x-env": {"exact": "canary"}
+                },
+                "uri": {"prefix": "/cart"}
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "cart-service",
+                  "port": {"number": 8080},
+                  "subset": "v2-canary"
+                }
+              }
+            ],
+            "timeout": "10s"
+          },
+          {
+            "match": [
+              {"uri": {"prefix": "/cart"}}
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "cart-service",
+                  "port": {"number": 8080},
+                  "subset": "v2"
+                },
+                "weight": 80
+              },
+              {
+                "destination": {
+                  "host": "cart-service",
+                  "port": {"number": 8080},
+                  "subset": "v1"
+                },
+                "weight": 20
+              }
+            ],
+            "timeout": "10s",
+            "retries": {
+              "attempts": 3,
+              "perTryTimeout": "3s"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "api-gateway",
+        "namespace": "platform",
+        "uid": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8091",
+        "resourceVersion": "223491",
+        "generation": 7,
+        "creationTimestamp": "2024-02-05T08:00:00Z",
+        "labels": {
+          "app": "api-gateway",
+          "team": "platform",
+          "version": "v4"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "..."
+        }
+      },
+      "spec": {
+        "hosts": ["api.example.com"],
+        "gateways": ["istio-system/main-gateway"],
+        "http": [
+          {
+            "match": [
+              {
+                "headers": {
+                  "x-env": {"exact": "canary"}
+                },
+                "uri": {"prefix": "/"}
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "api-gateway",
+                  "port": {"number": 8443},
+                  "subset": "v4-canary"
+                }
+              }
+            ]
+          },
+          {
+            "match": [
+              {"uri": {"prefix": "/"}}
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "api-gateway",
+                  "port": {"number": 8443},
+                  "subset": "v4"
+                }
+              }
+            ],
+            "timeout": "45s",
+            "retries": {
+              "attempts": 2,
+              "perTryTimeout": "15s",
+              "retryOn": "5xx,gateway-error"
+            },
+            "corsPolicy": {
+              "allowOrigins": [{"regex": "https://.*\\.example\\.com"}],
+              "allowMethods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+              "allowHeaders": ["Authorization", "Content-Type", "X-Request-ID", "X-Trace-ID"],
+              "exposeHeaders": ["X-Request-ID", "X-Trace-ID"],
+              "maxAge": "12h",
+              "allowCredentials": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "auth-service",
+        "namespace": "platform",
+        "uid": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f809102",
+        "resourceVersion": "231765",
+        "generation": 2,
+        "creationTimestamp": "2024-02-10T11:30:00Z",
+        "labels": {
+          "app": "auth-service",
+          "team": "platform",
+          "version": "v1"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "..."
+        }
+      },
+      "spec": {
+        "hosts": ["auth-service.platform.svc.cluster.local"],
+        "gateways": ["mesh"],
+        "http": [
+          {
+            "match": [
+              {"uri": {"exact": "/oauth/token"}},
+              {"uri": {"exact": "/oauth/authorize"}}
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "auth-service",
+                  "port": {"number": 8080},
+                  "subset": "v1"
+                }
+              }
+            ],
+            "timeout": "15s",
+            "retries": {
+              "attempts": 1,
+              "perTryTimeout": "10s"
+            },
+            "fault": {
+              "abort": {
+                "percentage": {"value": 0.01},
+                "httpStatus": 503
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "config-service",
+        "namespace": "platform",
+        "uid": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f80910213",
+        "resourceVersion": "245102",
+        "generation": 1,
+        "creationTimestamp": "2024-02-20T13:00:00Z",
+        "labels": {
+          "app": "config-service",
+          "team": "platform",
+          "version": "v1"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "..."
+        }
+      },
+      "spec": {
+        "hosts": ["config-service.platform.svc.cluster.local"],
+        "gateways": ["mesh"],
+        "http": [
+          {
+            "match": [
+              {"uri": {"prefix": "/config"}}
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "config-service",
+                  "port": {"number": 8080},
+                  "subset": "v1"
+                }
+              }
+            ],
+            "mirror": {
+              "host": "config-service-shadow",
+              "port": {"number": 8080},
+              "subset": "v2-beta"
+            },
+            "mirrorPercentage": {"value": 50.0},
+            "timeout": "5s",
+            "retries": {
+              "attempts": 3,
+              "perTryTimeout": "2s"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "prometheus-federation",
+        "namespace": "monitoring",
+        "uid": "b8c9d0e1-f2a3-4b4c-5d6e-7f8091021324",
+        "resourceVersion": "258437",
+        "generation": 2,
+        "creationTimestamp": "2024-03-01T07:45:00Z",
+        "labels": {
+          "app": "prometheus-federation",
+          "team": "observability",
+          "version": "v1"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "..."
+        }
+      },
+      "spec": {
+        "hosts": ["prometheus-federation.monitoring.svc.cluster.local"],
+        "gateways": ["mesh"],
+        "http": [
+          {
+            "match": [
+              {"uri": {"prefix": "/federate"}}
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "prometheus-federation",
+                  "port": {"number": 9090},
+                  "subset": "v1"
+                }
+              }
+            ],
+            "timeout": "120s",
+            "retries": {
+              "attempts": 2,
+              "perTryTimeout": "60s"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "jaeger-collector",
+        "namespace": "monitoring",
+        "uid": "c9d0e1f2-a3b4-4c5d-6e7f-809102132435",
+        "resourceVersion": "267891",
+        "generation": 3,
+        "creationTimestamp": "2024-03-05T15:20:00Z",
+        "labels": {
+          "app": "jaeger-collector",
+          "team": "observability",
+          "version": "v1"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "..."
+        }
+      },
+      "spec": {
+        "hosts": ["jaeger-collector.monitoring.svc.cluster.local"],
+        "gateways": ["mesh"],
+        "http": [
+          {
+            "match": [
+              {"uri": {"prefix": "/api/traces"}}
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "jaeger-collector",
+                  "port": {"number": 14268},
+                  "subset": "v1"
+                }
+              }
+            ],
+            "timeout": "30s",
+            "retries": {
+              "attempts": 5,
+              "perTryTimeout": "5s",
+              "retryOn": "5xx,reset,connect-failure,retriable-4xx"
+            }
+          },
+          {
+            "match": [
+              {"uri": {"prefix": "/api/services"}}
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "jaeger-query",
+                  "port": {"number": 16686},
+                  "subset": "v1"
+                }
+              }
+            ],
+            "timeout": "15s"
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "spark-thrift-server",
+        "namespace": "data",
+        "uid": "d0e1f2a3-b4c5-4d6e-7f80-910213243546",
+        "resourceVersion": "278654",
+        "generation": 1,
+        "creationTimestamp": "2024-03-12T19:00:00Z",
+        "labels": {
+          "app": "spark-thrift-server",
+          "team": "data-eng",
+          "version": "v1"
+        },
+        "annotations": {
+          "kubectl.kubernetes.io/last-applied-configuration": "..."
+        }
+      },
+      "spec": {
+        "hosts": ["spark-thrift-server.data.svc.cluster.local"],
+        "gateways": ["mesh"],
+        "http": [
+          {
+            "route": [
+              {
+                "destination": {
+                  "host": "spark-thrift-server",
+                  "port": {"number": 10000},
+                  "subset": "v1"
+                }
+              }
+            ],
+            "timeout": "300s",
+            "retries": {
+              "attempts": 2,
+              "perTryTimeout": "120s"
+            }
+          }
+        ],
+        "tcp": [
+          {
+            "match": [
+              {"port": 10000}
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "spark-thrift-server",
+                  "port": {"number": 10000}
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
