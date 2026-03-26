@@ -51,7 +51,8 @@ from typing import cast
 import httpx
 from fastmcp import FastMCP
 from fastmcp.client.transports import StreamableHttpTransport
-from fastmcp.server.dependencies import get_http_headers
+from fastmcp.exceptions import ToolError
+from fastmcp.server.dependencies import get_context, get_http_headers
 from fastmcp.server.middleware import Middleware
 from fastmcp.tools.tool import ToolResult
 from mcp import ClientSession
@@ -399,6 +400,43 @@ def _run_single_upstream(config: ProxyConfig, metrics: MetricsRecorder):
     proxy.run(transport="streamable-http", host=config.host, port=config.port)
 
 
+def _make_patched_run(proxy_tool, remote_name: str):
+    """Create a patched run() that calls upstream with the original (unprefixed) name.
+
+    Mirrors FastMCP ProxyTool.run() (v2.14.x) but uses *remote_name* for
+    the upstream call instead of ``proxy_tool.name`` (which carries the
+    server prefix).  No mutation of ``proxy_tool.name`` occurs, so
+    concurrent async calls are safe.
+    """
+
+    async def _run(arguments, context=None):
+        async with proxy_tool._client:  # noqa: SLF001
+            ctx = context if context is not None else get_context()
+            meta = None
+            if ctx is not None and hasattr(ctx, "request_context"):
+                req_ctx = ctx.request_context
+                if hasattr(req_ctx, "meta") and req_ctx.meta:
+                    meta = dict(req_ctx.meta)
+            result = await proxy_tool._client.call_tool_mcp(  # noqa: SLF001
+                name=remote_name, arguments=arguments, meta=meta,
+            )
+        if result.isError:
+            message = f"Upstream MCP tool '{remote_name}' returned an error"
+            if result.content:
+                for item in result.content:
+                    if isinstance(item, TextContent) and getattr(item, "text", None):
+                        message = item.text
+                        break
+            raise ToolError(message)
+        return ToolResult(
+            content=result.content,
+            structured_content=result.structuredContent,
+            meta=result.meta,
+        )
+
+    return _run
+
+
 def _run_multi_upstream(config: ProxyConfig, metrics: MetricsRecorder):
     """Multi-upstream mode: aggregate tools from multiple upstreams."""
     from fastmcp.server.proxy import ProxyTool
@@ -433,9 +471,13 @@ def _run_multi_upstream(config: ProxyConfig, metrics: MetricsRecorder):
 
                 # Create a new Client for each ProxyTool (they manage their own sessions)
                 tool_client = _make_client(srv_cfg)
+                remote_name = mcp_tool.name
                 proxy_tool = ProxyTool.from_mcp_tool(tool_client, mcp_tool)
-                # ProxyTool is a pydantic model — create a copy with the registered name
+                # Rename tool with server prefix for the local registry,
+                # but keep the original name for upstream calls
                 proxy_tool = proxy_tool.model_copy(update={"name": registered_name})
+                if prefix_tools and remote_name != registered_name:
+                    proxy_tool.__dict__['run'] = _make_patched_run(proxy_tool, remote_name)
                 server.add_tool(proxy_tool)
                 tool_server_map[registered_name] = server_name
 

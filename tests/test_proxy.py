@@ -313,6 +313,50 @@ class TestUnprefixedToolServerMap:
         assert mode == "condense"
 
 
+class TestPrefixedProxyToolRun:
+    """Test that prefixed proxy tools call upstream with the original name."""
+
+    def test_make_patched_run_uses_remote_name(self):
+        """The patched run function should call upstream with the unprefixed name."""
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from mcp.types import CallToolResult, TextContent
+
+        from mcp_condenser.proxy import _make_patched_run
+
+        # Create a mock ProxyTool-like object
+        mock_tool = MagicMock()
+        mock_tool.name = "myserver_get_pods"  # prefixed name
+
+        # Mock the client's call_tool_mcp to capture what name is passed
+        mock_client = AsyncMock()
+        mock_result = CallToolResult(
+            content=[TextContent(type="text", text="ok")],
+            isError=False,
+        )
+        mock_client.call_tool_mcp = AsyncMock(return_value=mock_result)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_tool._client = mock_client
+
+        patched_run = _make_patched_run(mock_tool, "get_pods")
+
+        # Run the patched function
+        with patch("mcp_condenser.proxy.get_context") as mock_get_ctx:
+            mock_get_ctx.return_value = MagicMock(spec=[])  # no request_context
+            result = asyncio.run(patched_run({"namespace": "default"}))
+
+        # Assert upstream was called with the UNPREFIXED name
+        mock_client.call_tool_mcp.assert_called_once_with(
+            name="get_pods",
+            arguments={"namespace": "default"},
+            meta=None,
+        )
+        # Assert the tool's registered name was NOT mutated
+        assert mock_tool.name == "myserver_get_pods"
+
+
 class TestToolCollisionDetection:
     """Test that collision detection works when prefix_tools is disabled."""
 
